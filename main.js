@@ -4,12 +4,14 @@ console.log('Content script loaded');
 // Define variables to track settings
 let blinkInterval = 500; // Default blink interval in milliseconds
 let numBlinks = 3; // Default number of blinks
+let numSurroundingWords = 0; // Default number of words to blink around the search term
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log(message)
     if (message.action === 'findInPage') {
         const searchTerm = message.searchTerm;
         chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+            console.log('Searching for', searchTerm);
             blinkLinesWithSearchTerm(searchTerm, tabs[0].id);
         });
     }
@@ -17,26 +19,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         // Update settings based on the message from the popup
         blinkInterval = message.blinkInterval;
         numBlinks = message.numBlinks;
+        numSurroundingWords = message.numSurroundingWords;
     }
 });
+
 function blinkLinesWithSearchTerm(searchTerm, tabId) {
     console.log(`Searching for "${searchTerm}"`, tabId);
     chrome.scripting.executeScript({
         target: { tabId: tabId },
-        function: (searchTerm, blinkInterval, numBlinks) => {
+        function: (searchTerm, blinkInterval, numBlinks, numSurroundingWords) => {
             const removeBlinkingStyles = () => {
                 const blinkingElements = document.querySelectorAll('.blink');
                 blinkingElements.forEach((element) => {
                     const parent = element.parentNode.parentNode;
-                    if(parent === null) return;
+                    if (parent === null) return;
                     // remove the span element and return it to the original parent with just text
                     parent.innerHTML = parent.textContent;
                 });
             };
 
-            const applyBlinkingStyles = (element) => {
-                const originalBackgroundColor = element.style.backgroundColor;
-                let currentBlinks = numBlinks*2;
+            const applyBlinkingStyles = () => {
+                let currentBlinks = numBlinks * 2;
 
                 const blinkIntervalId = setInterval(() => {
                     if (currentBlinks <= 0) {
@@ -44,12 +47,28 @@ function blinkLinesWithSearchTerm(searchTerm, tabId) {
                         element.style.backgroundColor = originalBackgroundColor;
                         return;
                     }
-
-                    if (element.style.backgroundColor === 'yellow') {
-                        element.style.backgroundColor = 'transparent';
-                    } else {
-                        element.style.backgroundColor = 'yellow';
+                    const blinkingElements = document.querySelectorAll('.blink');
+                    const offBlinkingElements = document.querySelectorAll('.blink-off');
+                    if(currentBlinks % 2 === 0) {
+                        blinkingElements.forEach((element) => {
+                            element.style.backgroundColor = 'transparent';
+                        });
+                        offBlinkingElements.forEach((element) => {
+                            element.style.backgroundColor = 'yellow';
+                        });
+                        
                     }
+                    else {
+                        blinkingElements.forEach((element) => {
+                            element.style.backgroundColor = 'yellow';
+                            element.style.color = 'black';
+                        });
+                        offBlinkingElements.forEach((element) => {
+                            element.style.backgroundColor = 'transparent';
+                        });
+                    }
+
+
                     currentBlinks--;
                 }, blinkInterval);
             };
@@ -57,23 +76,28 @@ function blinkLinesWithSearchTerm(searchTerm, tabId) {
             const findAndMatchText = (element, searchText) => {
                 if (element.nodeType === Node.TEXT_NODE) {
                     let replacedHTML = element.textContent;
-                    const regex = new RegExp(searchText, 'gi');
-                    if (regex.test(replacedHTML)) {
-                        replacedHTML = replacedHTML.replace(
-                            regex,
-                            '<mark class="blink">$&</mark>'
-                        );
-                        const span = document.createElement('span');
-                        span.innerHTML = replacedHTML;
-
-                        if (element.parentNode) {
-                            element.parentNode.replaceChild(span, element);
-                            const blinkElements = span.querySelectorAll('.blink');
-                            blinkElements.forEach((blinkElement) => {
-                                applyBlinkingStyles(blinkElement);
-                            });
+                    // for each searchTerm match
+                    let contentStrings = element.textContent.split(" ");
+                    const searchTermRegex = new RegExp(searchText, 'gi');
+                    for (let i = 0; i < contentStrings.length; i++) {
+                        if (contentStrings[i].match(searchTermRegex)) {
+                            // surround the match with a span element
+                            contentStrings[i] = contentStrings[i].replace(searchTermRegex, `<span class="blink">$&</span>`);
+                        }
+                        else {
+                            contentStrings[i] = `<span class="blink-off">${contentStrings[i]}</span>`;
                         }
                     }
+                    const div = document.createElement('div');
+                    div.innerHTML = contentStrings.join(" ");
+                    element.parentNode.replaceChild(div, element);
+                    const blinkElements = document.querySelectorAll('.blink');
+                    blinkElements.forEach((element) => {
+                        element.style.backgroundColor = 'yellow';
+                        element.style.color = 'black';
+                    });
+                    applyBlinkingStyles();
+                    
                 } else if (element.nodeType === Node.ELEMENT_NODE) {
                     for (let i = 0; i < element.childNodes.length; i++) {
                         findAndMatchText(element.childNodes[i], searchText);
@@ -86,6 +110,6 @@ function blinkLinesWithSearchTerm(searchTerm, tabId) {
                 return;
             findAndMatchText(document.body, searchTerm);
         },
-        args: [searchTerm, blinkInterval, numBlinks],
+        args: [searchTerm, blinkInterval, numBlinks, numSurroundingWords]
     });
 }
