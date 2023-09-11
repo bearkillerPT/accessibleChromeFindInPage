@@ -1,46 +1,60 @@
-/* popup.css */
-
-/* Style for the popup container */
 body {
-    width: 250px;
-    padding: 10px;
-    font-family: Arial, sans-serif;
-  }
-  
-  /* Style for the find-in-page input */
-  #findInput {
-    width: 100%;
-    padding: 5px;
-    margin-bottom: 10px;
-  }
-  
-  /* Style for the buttons */
-  button {
-    display: block;
-    width: 100%;
-    padding: 5px;
-    margin-bottom: 5px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    cursor: pointer;
-  }
-  
-  /* Style for the settings button */
-  #openSettings {
-    background-color: #2196F3;
-    font-size: 20px;
-  }
-  
-  /* Style for the settings panel (hidden by default) */
-  #settingsPanel {
-    display: none;
-    background-color: #f2f2f2;
-    padding: 10px;
-    border: 1px solid #ccc;
-    margin-top: 10px;
-  }
-  
-  /* Additional styling for the settings options in the panel */
-  /* Customize this part to fit your specific settings UI */
-  
+  width: 200px;
+}
+
+.popup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.settings-button {
+  font-size: 20px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.settings-popup {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  padding: 10px;
+  width: 200px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.close-button {
+  cursor: pointer;
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  font-size: 16px;
+}
+
+.settings-popup h2 {
+  margin: 0;
+}
+
+label {
+  margin: 5px 0;
+}
+
+input {
+  width: 100%;
+  margin: 5px 0;
+}
+
+button.save-button {
+  margin-top: 10px;
+  padding: 5px 10px;
+  background-color: #007acc;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}

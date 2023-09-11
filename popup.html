@@ -1,24 +1,30 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <link rel="stylesheet" type="text/css" href="popup.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="popup.css">
+    <title>Chrome Extension Settings</title>
 </head>
 <body>
-  <!-- Find-in-page input and buttons -->
-  <input type="text" id="findInput" placeholder="Find...">
-  <button id="findPrevious">Previous</button>
-  <button id="findNext">Next</button>
-
-  <!-- Button to open settings -->
-  <button id="openSettings">⚙️</button>
-
-  <!-- Settings panel (initially hidden) -->
-  <div id="settingsPanel" style="display: none;">
-    <!-- Add your settings options here -->
-  </div>
-
-  <!-- Include your JavaScript here -->
-  <script src="popup.js"></script>
-
+    <div class="popup">
+        <button id="settingsButton" class="settings-button">⚙️</button>
+        <input type="text" id="findInput" placeholder="Find in Page">
+        <div id="settingsPopup" class="settings-popup">
+            <span class="close-button" id="closeButton">✖️</span>
+            <h2>Extension Settings</h2>
+            <label for="blinkInterval">Blink Interval (ms):</label>
+            <input type="number" id="blinkInterval" min="100" step="100" value="1000">
+            <br>
+            <label for="numBlinks">Number of Blinks:</label>
+            <input type="number" id="numBlinks" min="1" value="3">
+            <br>
+            <label for="numSurroundingWords">Number of Surrounding Words:</label>
+            <input type="number" id="numSurroundingWords" min="0" value="5">
+            <br>
+            <button id="saveButton" class="save-button">Save</button>
+        </div>
+    </div>
+    <script src="popup.js"></script>
 </body>
 </html>
