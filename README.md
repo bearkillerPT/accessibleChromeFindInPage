@@ -31,7 +31,6 @@ It also allows to have a number of surrounding words blink alternatingly with th
 
 ## Contributing
 ### TODO
-- [ ] Fix surrounding words
 - [ ] Keyboard shortcuts
 - [ ] PDF support
 - [ ] Search term options (case sensitive, whole word, regex, etc.)

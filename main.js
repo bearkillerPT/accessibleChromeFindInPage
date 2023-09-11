@@ -57,8 +57,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
+let lastIntervalId = null;
+
 function blinkLinesWithSearchTerm(searchTerm, tabId) {
     console.log(`Searching for "${searchTerm}"`, tabId);
+
+    if (lastIntervalId) {
+        clearInterval(lastIntervalId);
+    }
+
     chrome.scripting.executeScript({
         target: { tabId: tabId },
         function: (searchTerm, blinkInterval, numBlinks, numSurroundingWords) => {
@@ -105,36 +112,32 @@ function blinkLinesWithSearchTerm(searchTerm, tabId) {
 
                     currentBlinks--;
                 }, blinkInterval);
+                return blinkIntervalId;
             };
 
             const findAndMatchText = (element, searchText) => {
                 if (element.nodeType === Node.TEXT_NODE) {
                     let contentStrings = element.textContent.split(" ");
                     const searchTermRegex = new RegExp(searchText, 'gi');
-                    let lastMatchIndex = -1;
                     for (let i = 0; i < contentStrings.length; i++) {
+                        if (contentStrings[i].includes('<span class="blink')) continue;
                         if (contentStrings[i].match(searchTermRegex)) {
-                            lastMatchIndex = i;
                             // surround the match with a span element
                             contentStrings[i] = contentStrings[i].replace(searchTermRegex, `<span class="blink">$&</span>`);
                             for (let j = 1; j <= numSurroundingWords; j++) {
                                 if (i - j >= 0 &&
-                                    contentStrings[i - j].trim() !== '' &&
-                                    !contentStrings[i - j].includes('<span class="blink')
-                                ) {
-                                    console.log(contentStrings[i - j])
+                                    contentStrings[i - j] &&
+                                    !(contentStrings[i - j].includes('<span class="blink')) &&
+                                    !(contentStrings[i - j].match(searchTermRegex))) {
                                     contentStrings[i - j] = `<span class="blink-off">${contentStrings[i - j]}</span>`;
                                 }
-
+                                if (i + j < contentStrings.length &&
+                                    contentStrings[i + j] &&
+                                    !(contentStrings[i + j].includes('class="blink')) &&
+                                    !(contentStrings[i + j].match(searchTermRegex))) {
+                                    contentStrings[i + j] = `<span class="blink-off">${contentStrings[i + j]}</span>`;
+                                }
                             }
-                        }
-                    }
-                    if (lastMatchIndex === -1) return;
-                    for (let j = 1; j <= numSurroundingWords; j++) {
-                        if (lastMatchIndex + j < contentStrings.length &&
-                            contentStrings[lastMatchIndex + j].trim() !== '' &&
-                            !contentStrings[lastMatchIndex + j].includes('<span class="blink')) {
-                            contentStrings[lastMatchIndex + j] = `<span class="blink-off">${contentStrings[lastMatchIndex + j]}</span>`;
                         }
                     }
 
@@ -146,7 +149,6 @@ function blinkLinesWithSearchTerm(searchTerm, tabId) {
                         blinkElement.style.backgroundColor = 'yellow';
                         blinkElement.style.color = 'black';
                     });
-                    applyBlinkingStyles();
 
                 } else if (element.nodeType === Node.ELEMENT_NODE) {
                     for (let i = 0; i < element.childNodes.length; i++) {
@@ -159,7 +161,11 @@ function blinkLinesWithSearchTerm(searchTerm, tabId) {
             if (searchTerm === '')
                 return;
             findAndMatchText(document.body, searchTerm);
+            return applyBlinkingStyles();
         },
         args: [searchTerm, blinkInterval, numBlinks, numSurroundingWords]
+    }, (results) => {
+        console.log('Blinking started');
+        lastIntervalId = results[0].result;
     });
 }
