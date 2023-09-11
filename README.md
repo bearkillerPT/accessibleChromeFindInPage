@@ -42,8 +42,11 @@ It also allows to have a number of surrounding words blink alternatingly with th
 If you wish to try out the extension, you can go to [this page](https://heaboo.bearkillerpt.xyz/).
 Checkout the [demo video](https://www.github.com/bearkillerpt/accessible-find-in-page/demo.mp4) to see it in action!
 
-Create an issue if you want more options besides the ones listed above.
+## Disclaimer
+This extension is still in development and may not work as expected. 
+Right now the extension looks at every tag containing text content but on a google search page, for example, the page brakes when the replacement spans are inserted.
 
+Create an issue if you want more options besides the ones listed above.
 
 I myself have Retinitis pigmentosa :/
 
