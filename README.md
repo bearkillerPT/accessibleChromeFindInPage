@@ -31,10 +31,13 @@ It also allows to have a number of surrounding words blink alternatingly with th
 
 ## Contributing
 ### TODO
+- [ ] Fix surrounding words
 - [ ] Keyboard shortcuts
+- [ ] PDF support
 - [ ] Search term options (case sensitive, whole word, regex, etc.)
 - [ ] Selecting only elements that CTRL+F would select (I've tried a few things, but I can't get exactly the same results)
 - [ ] Selecting a specific result and going to previous/next result using different color and shortcut
+
 
 ## Example
 If you wish to try out the extension, you can go to [this page](https://heaboo.bearkillerpt.xyz/).
