@@ -67,7 +67,7 @@ function blinkLinesWithSearchTerm(searchTerm, tabId) {
                 // merge the blink and blink-off texts into one text node
                 blinkingElements.forEach((element) => {
                     const parent = element.parentNode;
-                    if(!parent) return;
+                    if (!parent) return;
                     parent.innerHTML = parent.innerHTML = parent.textContent
                 }
                 );
@@ -111,19 +111,30 @@ function blinkLinesWithSearchTerm(searchTerm, tabId) {
                 if (element.nodeType === Node.TEXT_NODE) {
                     let contentStrings = element.textContent.split(" ");
                     const searchTermRegex = new RegExp(searchText, 'gi');
-
+                    let lastMatchIndex = -1;
                     for (let i = 0; i < contentStrings.length; i++) {
                         if (contentStrings[i].match(searchTermRegex)) {
+                            lastMatchIndex = i;
                             // surround the match with a span element
                             contentStrings[i] = contentStrings[i].replace(searchTermRegex, `<span class="blink">$&</span>`);
                             for (let j = 1; j <= numSurroundingWords; j++) {
-                                if (i - j >= 0) {
+                                if (i - j >= 0 &&
+                                    contentStrings[i - j].trim() !== '' &&
+                                    !contentStrings[i - j].includes('<span class="blink')
+                                ) {
+                                    console.log(contentStrings[i - j])
                                     contentStrings[i - j] = `<span class="blink-off">${contentStrings[i - j]}</span>`;
                                 }
-                                if (i + j < contentStrings.length) {
-                                    contentStrings[i + j] = `<span class="blink-off">${contentStrings[i + j]}</span>`;
-                                }
+
                             }
+                        }
+                    }
+                    if (lastMatchIndex === -1) return;
+                    for (let j = 1; j <= numSurroundingWords; j++) {
+                        if (lastMatchIndex + j < contentStrings.length &&
+                            contentStrings[lastMatchIndex + j].trim() !== '' &&
+                            !contentStrings[lastMatchIndex + j].includes('<span class="blink')) {
+                            contentStrings[lastMatchIndex + j] = `<span class="blink-off">${contentStrings[lastMatchIndex + j]}</span>`;
                         }
                     }
 
