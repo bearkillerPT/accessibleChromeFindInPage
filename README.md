@@ -39,7 +39,7 @@ It also allows to have a number of surrounding words blink alternatingly with th
 
 
 ## Example
-If you wish to try out the extension, you can go to [this page](https://heaboo.bearkillerpt.xyz/).
+If you wish to try out the extension, you can go to [this page](https://heaboo.bearkillerpt.xyz/), to test in a really simple page, or, as the example in the demo video does, try it on [GitHub](https://www.github.com/bearkillerpt/accessible-find-in-page/).
 Checkout the [demo video](https://www.github.com/bearkillerpt/accessible-find-in-page/demo.mp4) to see it in action!
 
 ## Disclaimer
