@@ -23,10 +23,25 @@ Accessible find in page is available on the [Chrome Web Store](https://chrome.go
 4. Click "Save"
 
 ## Options
+### Search term
+(TODO)
 ### Blinking
 Blinking is the main feature of this extension. It makes the lines containing the search term blink. You can set the blink interval and the number of blinks.
+It also allows to have a number of surrounding words blink alternatingly with the search term.
 
-Create an issue if you want more options.
+## Contributing
+### TODO
+- [ ] Keyboard shortcuts
+- [ ] Search term options (case sensitive, whole word, regex, etc.)
+- [ ] Selecting only elements that CTRL+F would select (I've tried a few things, but I can't get exactly the same results)
+- [ ] Selecting a specific result and going to previous/next result using different color and shortcut
+
+## Example
+If you wish to try out the extension, you can go to [this page](https://heaboo.bearkillerpt.xyz/).
+Checkout the [demo video](https://www.github.com/bearkillerpt/accessible-find-in-page/demo.mp4) to see it in action!
+
+Create an issue if you want more options besides the ones listed above.
+
 
 I myself have Retinitis pigmentosa :/
 
