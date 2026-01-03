@@ -3,7 +3,7 @@ export function performSearch(
   blinkInterval: number,
   numBlinks: number,
   numSurroundingWords: number
-): number | null {
+): { blinkIntervalId: number | null; count: number; currentIndex: number | null } {
   // Helpers to manage the blink interval id stored on window
   const getBlinkIntervalId = (): number | null =>
     (window as unknown as { __accessibleFindBlinkIntervalId?: number | null })
@@ -33,6 +33,24 @@ export function performSearch(
     });
   };
 
+  const getMatches = (): HTMLElement[] =>
+    (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).
+      __accessibleFindMatches ?? [];
+
+  const setMatches = (m: HTMLElement[]): void => {
+    (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).
+      __accessibleFindMatches = m;
+  };
+
+  const getCurrentIndex = (): number | null =>
+    (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
+      __accessibleFindCurrentIndex ?? null;
+
+  const setCurrentIndex = (idx: number | null): void => {
+    (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
+      __accessibleFindCurrentIndex = idx;
+  };
+
   const setElementsHighlighted = (
     elements: NodeListOf<Element>,
     highlighted: boolean
@@ -47,6 +65,17 @@ export function performSearch(
         el.style.removeProperty("color");
       }
     });
+  };
+
+  const applyCurrentSelection = (index: number | null): void => {
+    const matches = getMatches();
+    // clear any previous outlines
+    matches.forEach((m) => m.style.removeProperty("outline"));
+    if (index === null) return;
+    const el = matches[index];
+    if (!el) return;
+    el.style.border = "5px solid orange";
+    el.scrollIntoView({ block: "center", inline: "nearest" });
   };
 
   const applyBlinkingStyles = (): number => {
@@ -128,7 +157,68 @@ export function performSearch(
   };
 
   removeBlinkingStyles();
-  if (!searchTerm) return null;
+  setMatches([]);
+  setCurrentIndex(null);
+  if (!searchTerm) {
+    return { blinkIntervalId: null, count: 0, currentIndex: null };
+  }
   findAndMatchText(document.body, searchTerm);
-  return applyBlinkingStyles();
+  const matches = Array.from(document.querySelectorAll(".blink")) as HTMLElement[];
+  setMatches(matches);
+  // Determine default selection closest to viewport center
+  let defaultIndex: number | null = null;
+  if (matches.length > 0) {
+    const viewportCenterY = window.scrollY + window.innerHeight / 2;
+    let bestDist = Number.POSITIVE_INFINITY;
+    let bestIdx = 0;
+    for (let i = 0; i < matches.length; i++) {
+      const rect = matches[i].getBoundingClientRect();
+      const centerY = rect.top + window.scrollY + rect.height / 2;
+      const dist = Math.abs(centerY - viewportCenterY);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = i;
+      }
+    }
+    defaultIndex = bestIdx;
+  }
+  setCurrentIndex(defaultIndex);
+  applyCurrentSelection(defaultIndex);
+  const id = applyBlinkingStyles();
+  return { blinkIntervalId: id, count: matches.length, currentIndex: defaultIndex };
+}
+
+export function navigateMatches(direction: "next" | "prev"): { count: number; currentIndex: number | null } {
+  const getMatches = (): HTMLElement[] =>
+    (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).
+      __accessibleFindMatches ?? [];
+  const setCurrentIndex = (idx: number | null): void => {
+    (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
+      __accessibleFindCurrentIndex = idx;
+  };
+  const getCurrentIndex = (): number | null =>
+    (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
+      __accessibleFindCurrentIndex ?? null;
+  const matches = getMatches();
+  const count = matches.length;
+  if (count === 0) {
+    setCurrentIndex(null);
+    return { count: 0, currentIndex: null };
+  }
+  let idx = getCurrentIndex();
+  if (idx === null) idx = 0;
+  if (direction === "next") {
+    idx = (idx + 1) % count;
+  } else {
+    idx = (idx - 1 + count) % count;
+  }
+  setCurrentIndex(idx);
+  // Apply selection outline and scroll
+  matches.forEach((m) => m.style.removeProperty("outline"));
+  const el = matches[idx];
+  if (el) {
+    el.style.border = "5px solid orange";
+    el.scrollIntoView({ block: "center", inline: "nearest" });
+  }
+  return { count, currentIndex: idx };
 }

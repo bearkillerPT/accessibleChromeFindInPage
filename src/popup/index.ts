@@ -45,11 +45,30 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   const findInput = document.getElementById('findInput') as HTMLInputElement;
+  const matchCountEl = document.getElementById('matchCount') as HTMLSpanElement;
+  const prevButton = document.getElementById('prevButton') as HTMLButtonElement;
+  const nextButton = document.getElementById('nextButton') as HTMLButtonElement;
   findInput.addEventListener('input', handleFindInputChange);
+  prevButton.addEventListener('click', () => navigate('prev'));
+  nextButton.addEventListener('click', () => navigate('next'));
 
   function handleFindInputChange(event: Event) {
     const target = event.target as HTMLInputElement;
     const searchTerm = target.value;
-    chrome.runtime.sendMessage({ action: 'findInPage', searchTerm });
+    chrome.runtime.sendMessage({ action: 'findInPage', searchTerm }, (response: { ok: boolean; count?: number } | null) => {
+      if (response && typeof response.count === 'number') {
+        matchCountEl.textContent = String(response.count);
+      } else {
+        matchCountEl.textContent = '0';
+      }
+    });
+  }
+
+  function navigate(direction: 'next' | 'prev'): void {
+    chrome.runtime.sendMessage({ action: 'navigateMatch', direction }, (response: { ok: boolean; count?: number } | null) => {
+      if (response && typeof response.count === 'number') {
+        matchCountEl.textContent = String(response.count);
+      }
+    });
   }
 });

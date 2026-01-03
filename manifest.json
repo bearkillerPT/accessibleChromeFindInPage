@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Accessible find in page",
-  "version": "1.0",
+  "version": "1.1.0",
   "description": "This extension enhances CTRL+F search, highlighting and blinking. Customize settings for a better search experience.",
   "permissions": [
     "activeTab",

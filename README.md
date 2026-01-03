@@ -10,22 +10,18 @@ Accessible find in page is available on the [Chrome Web Store](https://chrome.go
 ### From source
 1. Clone the repository
 2. Run `npm install`
-3. (Optional) Run any scripts if you add a build step
+3. Run `npm run build`
 4. Open the extensions page in your browser
 5. Enable developer mode
 6. Click "Load unpacked extension"
 7. Select the `dist` folder
 
 ## Usage
-1. Open the extensions page in your browser
-2. Click "Options" under Accessible find in page
-3. Set the options to your liking
-4. Click "Save"
-
-## Structure
-- src/background: service worker entry and search dispatch logic
-- src/content: injected page logic that performs highlighting/blinking
-- src/popup: popup UI (HTML/CSS/JS) and settings management
+1. Click the extension icon to open the popup
+2. Type a search term; matching lines blink
+3. Use ▲/▼ to navigate previous/next match
+4. The default selected match is closest to the viewport center
+5. The counter shows total matches found
 
 ## Options
 ### Search term
@@ -33,6 +29,9 @@ Accessible find in page is available on the [Chrome Web Store](https://chrome.go
 ### Blinking
 Blinking is the main feature of this extension. It makes the lines containing the search term blink. You can set the blink interval and the number of blinks.
 It also allows to have a number of surrounding words blink alternatingly with the search term.
+
+### Navigation
+When a search is active, the extension selects the match closest to the center of the viewport. You can navigate through matches using the ▲ (previous) and ▼ (next) buttons. The popup displays the total number of matches found.
 
 ## Contributing
 ### TODO

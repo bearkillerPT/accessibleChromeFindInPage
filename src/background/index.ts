@@ -1,6 +1,6 @@
 import { defaultSettings, getSettings, setSettings } from './settings.js';
 import type { Settings } from './settings.js';
-import { blinkLinesWithSearchTerm } from './search.js';
+import { blinkLinesWithSearchTerm, navigateMatch } from './search.js';
 
 let settings: Settings = { ...defaultSettings };
 
@@ -12,7 +12,8 @@ let settings: Settings = { ...defaultSettings };
 type RuntimeMessage =
   | { action: 'getSettings' }
   | { action: 'setSettings'; settings: Settings }
-  | { action: 'findInPage'; searchTerm: string };
+  | { action: 'findInPage'; searchTerm: string }
+  | { action: 'navigateMatch'; direction: 'next' | 'prev' };
 
 chrome.runtime.onMessage.addListener(
   (message: RuntimeMessage, _sender, sendResponse): boolean | void => {
@@ -40,9 +41,24 @@ chrome.runtime.onMessage.addListener(
           sendResponse({ ok: false, error: 'No active tab' });
           return;
         }
-        blinkLinesWithSearchTerm(searchTerm, tabId, settings).then(() => {
-          // Content script manages blinking lifecycle; just acknowledge success
-          sendResponse({ ok: true });
+        blinkLinesWithSearchTerm(searchTerm, tabId, settings).then((result) => {
+          sendResponse({ ok: true, ...result });
+        });
+      });
+      return true; // async response
+    }
+
+    if (action === 'navigateMatch') {
+      const direction = message.direction;
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const tab = tabs && tabs[0] ? tabs[0] : undefined;
+        const tabId = tab ? tab.id : undefined;
+        if (typeof tabId !== 'number') {
+          sendResponse({ ok: false, error: 'No active tab' });
+          return;
+        }
+        navigateMatch(tabId, direction).then((result) => {
+          sendResponse({ ok: true, ...result });
         });
       });
       return true; // async response
