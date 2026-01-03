@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+  <title>Accessible Find In Page</title>
+</head>
+<body>
+  <div class="popup">
+    <button id="settingsButton" class="settings-button">⚙️</button>
+    <input type="text" id="findInput" placeholder="Find in Page" />
+    <div id="settingsPopup" class="settings-popup">
+      <span class="close-button" id="closeButton">✖️</span>
+      <h2>Extension Settings</h2>
+      <label for="blinkInterval">Blink Interval (ms):</label>
+      <input type="number" id="blinkInterval" min="100" step="100" value="1000" />
+      <br />
+      <label for="numBlinks">Number of Blinks:</label>
+      <input type="number" id="numBlinks" min="1" value="3" />
+      <br />
+      <label for="numSurroundingWords">Number of Surrounding Words:</label>
+      <input type="number" id="numSurroundingWords" min="0" value="5" />
+      <br />
+      <button id="saveButton" class="save-button">Save</button>
+    </div>
+  </div>
+  <!-- Load compiled TS output from dist -->
+  <script src="../../dist/popup/index.js"></script>
+</body>
+</html>

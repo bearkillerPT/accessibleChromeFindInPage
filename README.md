@@ -10,7 +10,7 @@ Accessible find in page is available on the [Chrome Web Store](https://chrome.go
 ### From source
 1. Clone the repository
 2. Run `npm install`
-3. Run `npm run build`
+3. (Optional) Run any scripts if you add a build step
 4. Open the extensions page in your browser
 5. Enable developer mode
 6. Click "Load unpacked extension"
@@ -21,6 +21,11 @@ Accessible find in page is available on the [Chrome Web Store](https://chrome.go
 2. Click "Options" under Accessible find in page
 3. Set the options to your liking
 4. Click "Save"
+
+## Structure
+- src/background: service worker entry and search dispatch logic
+- src/content: injected page logic that performs highlighting/blinking
+- src/popup: popup UI (HTML/CSS/JS) and settings management
 
 ## Options
 ### Search term

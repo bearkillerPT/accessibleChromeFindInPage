@@ -9,10 +9,10 @@
     "storage"
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "src/popup/index.html"
   },
   "background": {
-    "service_worker": "main.js",
+    "service_worker": "dist/background/index.js",
     "type": "module"
   },
   "icons": {

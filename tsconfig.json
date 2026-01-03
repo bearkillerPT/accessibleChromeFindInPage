@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2021", "DOM"],
+    "rootDir": "src",
+    "outDir": "dist",
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmitOnError": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "allowJs": false,
+    "esModuleInterop": true,
+    "types": ["chrome"],
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
