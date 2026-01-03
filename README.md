@@ -22,6 +22,7 @@ Accessible find in page is available on the [Chrome Web Store](https://chrome.go
 3. Use ▲/▼ to navigate previous/next match
 4. The default selected match is closest to the viewport center
 5. The counter shows total matches found
+ - Or press the shortcut to open the popup (configurable under chrome://extensions/shortcuts; default is Ctrl+Shift+F)
 
 ## Options
 ### Search term

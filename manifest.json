@@ -6,7 +6,8 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "tabs"
   ],
   "action": {
     "default_popup": "dist/popup-app/index.html"
@@ -14,6 +15,14 @@
   "background": {
     "service_worker": "dist/background/index.js",
     "type": "module"
+  },
+  "commands": {
+    "open_popup": {
+      "description": "Open Accessible Find In Page popup",
+      "suggested_key": {
+        "default": "Ctrl+F"
+      }
+    }
   },
   "icons": {
     "128": "128.png"

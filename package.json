@@ -6,7 +6,8 @@
   "scripts": {
     "build:ts": "tsc -p tsconfig.json",
     "build:popup": "npm --prefix popup-app run build",
-    "build": "npm run build:ts && npm run build:popup"
+    "build:onboarding": "npm --prefix onboarding-app install --no-audit --no-fund && npm --prefix onboarding-app run build",
+    "build": "npm run build:ts && npm run build:popup && npm run build:onboarding"
   },
   "author": "Gil Teixeira",
   "license": "ISC",

@@ -52,6 +52,35 @@ document.addEventListener('DOMContentLoaded', function () {
   prevButton.addEventListener('click', () => navigate('prev'));
   nextButton.addEventListener('click', () => navigate('next'));
 
+  // Autofocus the search input when the popup opens
+  try {
+    findInput.focus();
+    findInput.select();
+  } catch {}
+
+  // Clear search and close popup on Escape
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      try {
+        findInput.value = '';
+        chrome.runtime.sendMessage({ action: 'findInPage', searchTerm: '' }, () => {
+          window.close();
+        });
+      } catch {
+        window.close();
+      }
+    }
+  };
+  document.addEventListener('keydown', onKeyDown);
+
+  // Clear search when the popup is closed
+  const onUnload = () => {
+    try {
+      chrome.runtime.sendMessage({ action: 'findInPage', searchTerm: '' });
+    } catch {}
+  };
+  window.addEventListener('unload', onUnload);
+
   function handleFindInputChange(event: Event) {
     const target = event.target as HTMLInputElement;
     const searchTerm = target.value;

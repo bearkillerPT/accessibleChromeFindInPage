@@ -9,11 +9,20 @@ let settings: Settings = { ...defaultSettings };
   console.log('Accessible Find In Page service worker initialized');
 })();
 
+// Open onboarding page after fresh install
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install') {
+    const url = chrome.runtime.getURL('dist/onboarding-app/index.html');
+    chrome.tabs.create({ url });
+  }
+});
+
 type RuntimeMessage =
   | { action: 'getSettings' }
   | { action: 'setSettings'; settings: Settings }
   | { action: 'findInPage'; searchTerm: string }
-  | { action: 'navigateMatch'; direction: 'next' | 'prev' };
+  | { action: 'navigateMatch'; direction: 'next' | 'prev' }
+  | { action: 'openShortcuts' };
 
 chrome.runtime.onMessage.addListener(
   (message: RuntimeMessage, _sender, sendResponse): boolean | void => {
@@ -63,5 +72,38 @@ chrome.runtime.onMessage.addListener(
       });
       return true; // async response
     }
+
+    if (action === 'openShortcuts') {
+      try {
+        chrome.tabs.create({ url: 'chrome://extensions/shortcuts' }, () => {
+          const err = chrome.runtime.lastError;
+          if (err) {
+            sendResponse({ ok: false, error: err.message });
+          } else {
+            sendResponse({ ok: true });
+          }
+        });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e) });
+      }
+      return true; // async response
+    }
   }
 );
+
+  // Open popup via keyboard shortcut command
+  chrome.commands.onCommand.addListener(async (command) => {
+    if (command !== 'open_popup') return;
+    try {
+      // If supported, open the extension's action popup directly
+      const actionAny = chrome.action as unknown as { openPopup?: () => Promise<void> };
+      if (actionAny && typeof actionAny.openPopup === 'function') {
+        await actionAny.openPopup!();
+        return;
+      }
+    } catch (e) {
+      // fall through to window popup
+    }
+    const url = chrome.runtime.getURL('dist/popup-app/index.html');
+    chrome.windows.create({ url, type: 'popup', width: 300, height: 240, focused: true });
+  });

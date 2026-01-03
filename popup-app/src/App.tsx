@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type Settings = {
   blinkInterval: number;
@@ -29,6 +29,8 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [count, setCount] = useState(0);
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
+  const [needsShortcut, setNeedsShortcut] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     chrome.runtime.sendMessage({ action: 'getSettings' }, (response: Settings | null) => {
@@ -36,6 +38,58 @@ export default function App() {
         setSettings(response);
       }
     });
+  }, []);
+
+  // Autofocus the search input when the popup opens
+  useEffect(() => {
+    // Focus and select any existing text for quick replacement
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
+
+  // Clear search and close popup on Escape
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Reset the search in the active tab
+        try {
+          chrome.runtime.sendMessage({ action: 'findInPage', searchTerm: '' }, () => {
+            // Best-effort close; extension popups allow window.close()
+            setSearchTerm('');
+            window.close();
+          });
+        } catch {
+          setSearchTerm('');
+          window.close();
+        }
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  // Clear search when the popup is closed/unmounted
+  useEffect(() => {
+    return () => {
+      try {
+        chrome.runtime.sendMessage({ action: 'findInPage', searchTerm: '' });
+      } catch {
+        // Ignore if runtime is unavailable, e.g., during unload
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    // Check whether the keyboard shortcut is assigned; if not, prompt the user
+    try {
+      chrome.commands.getAll((cmds) => {
+        const openPopup = cmds?.find((c) => c.name === 'open_popup');
+        const hasShortcut = !!openPopup?.shortcut && openPopup.shortcut.trim().length > 0;
+        setNeedsShortcut(!hasShortcut);
+      });
+    } catch {
+      // Ignore if commands API not available in this context
+    }
   }, []);
 
   const canSave = useMemo(() => !!settings, [settings]);
@@ -71,6 +125,25 @@ export default function App() {
 
   return (
     <div className="flex flex-col p-2 gap-2">
+      {needsShortcut && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs rounded p-2">
+          <div className="flex items-center justify-between gap-2">
+            <span>Set a keyboard shortcut for <strong>"Open Accessible Find In Page popup"</strong> (not "Activate the extension").</span>
+            <button
+              className="border rounded px-2 py-0.5 hover:bg-yellow-100"
+              onClick={() => {
+                const ua = navigator.userAgent.toLowerCase();
+                const url = ua.includes('edg/') ? 'edge://extensions/shortcuts' : (ua.includes('vivaldi') ? 'vivaldi://extensions/shortcuts' : 'chrome://extensions/shortcuts');
+
+                chrome.runtime.sendMessage({ action: 'openShortcuts' }, async (res: { ok: boolean; error?: string } | null) => {
+                  if (res && res.ok) return;
+                  alert('Please open ' + url + ' and set a shortcut for "Open Accessible Find In Page popup" (not "Activate the extension").');
+                });
+              }}
+            >Open shortcut settings</button>
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <button
           className="text-xl"
@@ -78,6 +151,8 @@ export default function App() {
           onClick={() => setOpen((o) => !o)}
         >⚙️</button>
         <input
+          ref={inputRef}
+          autoFocus
           value={searchTerm}
           onChange={(e) => onTermChange(e.target.value)}
           placeholder="Find in Page"
