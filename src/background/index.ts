@@ -3,7 +3,6 @@ import type { Settings } from './settings.js';
 import { blinkLinesWithSearchTerm } from './search.js';
 
 let settings: Settings = { ...defaultSettings };
-let lastIntervalId: number | null = null;
 
 (async function init(): Promise<void> {
   settings = await getSettings();
@@ -41,11 +40,8 @@ chrome.runtime.onMessage.addListener(
           sendResponse({ ok: false, error: 'No active tab' });
           return;
         }
-        blinkLinesWithSearchTerm(searchTerm, tabId, settings).then((intervalId) => {
-          if (lastIntervalId !== null) {
-            clearInterval(lastIntervalId);
-          }
-          lastIntervalId = intervalId;
+        blinkLinesWithSearchTerm(searchTerm, tabId, settings).then(() => {
+          // Content script manages blinking lifecycle; just acknowledge success
           sendResponse({ ok: true });
         });
       });

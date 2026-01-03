@@ -5,9 +5,9 @@ export interface Settings {
 }
 
 export const defaultSettings: Settings = {
-  blinkInterval: 1000,
-  numBlinks: 3,
-  numSurroundingWords: 5,
+  blinkInterval: 400,
+  numBlinks: 2,
+  numSurroundingWords: 1,
 };
 
 export function getSettings(): Promise<Settings> {

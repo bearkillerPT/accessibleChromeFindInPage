@@ -4,18 +4,48 @@ export function performSearch(
   numBlinks: number,
   numSurroundingWords: number
 ): number | null {
+  // Helpers to manage the blink interval id stored on window
+  const getBlinkIntervalId = (): number | null =>
+    (window as unknown as { __accessibleFindBlinkIntervalId?: number | null })
+      .__accessibleFindBlinkIntervalId ?? null;
+
+  const setBlinkIntervalId = (id: number | null): void => {
+    (
+      window as unknown as { __accessibleFindBlinkIntervalId?: number | null }
+    ).__accessibleFindBlinkIntervalId = id;
+  };
+
+  // Stop any previous blinking interval running in the page context
+  const prevBlinkIntervalId = getBlinkIntervalId();
+  if (typeof prevBlinkIntervalId === "number") {
+    window.clearInterval(prevBlinkIntervalId);
+    setBlinkIntervalId(null);
+  }
+
   const removeBlinkingStyles = (): void => {
-    const blinkingElements = document.querySelectorAll('.blink');
+    const blinkingElements = document.querySelectorAll(
+      ".blink, .blink-off"
+    );
     blinkingElements.forEach((element) => {
       const parent = element.parentNode as HTMLElement | null;
       if (!parent) return;
-      parent.innerHTML = parent.textContent ?? '';
+      parent.innerHTML = parent.textContent ?? "";
     });
-    const offBlinkingElements = document.querySelectorAll('.blink-off');
-    offBlinkingElements.forEach((element) => {
-      const parent = element.parentNode as HTMLElement | null;
-      if (!parent) return;
-      parent.innerHTML = parent.textContent ?? '';
+  };
+
+  const setElementsHighlighted = (
+    elements: NodeListOf<Element>,
+    highlighted: boolean
+  ): void => {
+    elements.forEach((element) => {
+      const el = element as HTMLElement;
+      if (highlighted) {
+        el.style.backgroundColor = "yellow";
+        el.style.color = "black";
+      } else {
+        el.style.removeProperty("background-color");
+        el.style.removeProperty("color");
+      }
     });
   };
 
@@ -25,39 +55,35 @@ export function performSearch(
     const blinkIntervalId = window.setInterval(() => {
       if (currentBlinks <= 0) {
         window.clearInterval(blinkIntervalId);
+        setBlinkIntervalId(null);
         return;
       }
-      const blinkingElements = document.querySelectorAll('.blink');
-      const offBlinkingElements = document.querySelectorAll('.blink-off');
-      if (currentBlinks % 2 === 0) {
-        blinkingElements.forEach((element) => {
-          (element as HTMLElement).style.backgroundColor = 'transparent';
-        });
-        offBlinkingElements.forEach((element) => {
-          (element as HTMLElement).style.backgroundColor = 'yellow';
-        });
-      } else {
-        blinkingElements.forEach((element) => {
-          const el = element as HTMLElement;
-          el.style.backgroundColor = 'yellow';
-          el.style.color = 'black';
-        });
-        offBlinkingElements.forEach((element) => {
-          (element as HTMLElement).style.backgroundColor = 'transparent';
-        });
-      }
+      const blinkingElements = document.querySelectorAll(".blink");
+      const offBlinkingElements = document.querySelectorAll(".blink-off");
+      const highlightBlink = currentBlinks % 2 === 1;
+      setElementsHighlighted(blinkingElements, highlightBlink);
+      setElementsHighlighted(offBlinkingElements, !highlightBlink);
 
       currentBlinks--;
     }, blinkInterval);
+    setBlinkIntervalId(blinkIntervalId);
     return blinkIntervalId;
   };
 
   const findAndMatchText = (element: Node, searchText: string): void => {
     if (element.nodeType === Node.TEXT_NODE) {
-      const text = (element.textContent ?? '').trim();
+      const text = (element.textContent ?? "").trim();
       if (!text) return;
-      const contentStrings = text.split(' ');
-      const searchTermRegex = new RegExp(searchText, 'gi');
+      const contentStrings = text.split(" ");
+      const searchTermRegex = new RegExp(searchText, "gi");
+      const shouldWrapOff = (token: string): boolean => {
+        return (
+          !!token &&
+          !token.includes('class="blink') &&
+          !token.includes('<span class="blink') &&
+          !token.match(searchTermRegex)
+        );
+      };
       for (let i = 0; i < contentStrings.length; i++) {
         const token = contentStrings[i];
         if (token.includes('<span class="blink')) continue;
@@ -69,37 +95,30 @@ export function performSearch(
           for (let j = 1; j <= numSurroundingWords; j++) {
             const left = i - j;
             const right = i + j;
-            if (
-              left >= 0 &&
-              contentStrings[left] &&
-              !contentStrings[left].includes('<span class="blink') &&
-              !contentStrings[left].match(searchTermRegex)
-            ) {
-              contentStrings[left] = `<span class="blink-off">${contentStrings[left]}</span>`;
+            if (left >= 0 && shouldWrapOff(contentStrings[left])) {
+              contentStrings[
+                left
+              ] = `<span class="blink-off">${contentStrings[left]}</span>`;
             }
             if (
               right < contentStrings.length &&
-              contentStrings[right] &&
-              !contentStrings[right].includes('class="blink') &&
-              !contentStrings[right].match(searchTermRegex)
+              shouldWrapOff(contentStrings[right])
             ) {
-              contentStrings[right] = `<span class="blink-off">${contentStrings[right]}</span>`;
+              contentStrings[
+                right
+              ] = `<span class="blink-off">${contentStrings[right]}</span>`;
             }
           }
         }
       }
 
-      const div = document.createElement('div');
-      div.innerHTML = contentStrings.join(' ');
+      const div = document.createElement("div");
+      div.innerHTML = contentStrings.join(" ");
       const parent = element.parentNode as HTMLElement | null;
       if (!parent) return;
       parent.replaceChild(div, element);
-      const blinkElements = document.querySelectorAll('.blink');
-      blinkElements.forEach((blinkElement) => {
-        const el = blinkElement as HTMLElement;
-        el.style.backgroundColor = 'yellow';
-        el.style.color = 'black';
-      });
+      const blinkElements = document.querySelectorAll(".blink");
+      setElementsHighlighted(blinkElements, true);
     } else if (element.nodeType === Node.ELEMENT_NODE) {
       const el = element as Element;
       for (let i = 0; i < el.childNodes.length; i++) {
