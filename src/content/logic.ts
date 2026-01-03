@@ -2,7 +2,11 @@ export function performSearch(
   searchTerm: string,
   blinkInterval: number,
   numBlinks: number,
-  numSurroundingWords: number
+  numSurroundingWords: number,
+  highlightBgColor: string,
+  highlightTextColor: string,
+  outlineColor: string,
+  outlineWidth: number
 ): { blinkIntervalId: number | null; count: number; currentIndex: number | null } {
   // Helpers to manage the blink interval id stored on window
   const getBlinkIntervalId = (): number | null =>
@@ -58,8 +62,8 @@ export function performSearch(
     elements.forEach((element) => {
       const el = element as HTMLElement;
       if (highlighted) {
-        el.style.backgroundColor = "yellow";
-        el.style.color = "black";
+        el.style.backgroundColor = highlightBgColor;
+        el.style.color = highlightTextColor;
       } else {
         el.style.removeProperty("background-color");
         el.style.removeProperty("color");
@@ -70,11 +74,14 @@ export function performSearch(
   const applyCurrentSelection = (index: number | null): void => {
     const matches = getMatches();
     // clear any previous outlines
-    matches.forEach((m) => m.style.removeProperty("outline"));
+    matches.forEach((m) => {
+      m.style.removeProperty("outline");
+      m.style.removeProperty("border");
+    });
     if (index === null) return;
     const el = matches[index];
     if (!el) return;
-    el.style.border = "5px solid orange";
+    el.style.outline = `${outlineWidth}px solid ${outlineColor}`;
     el.scrollIntoView({ block: "center", inline: "nearest" });
   };
 
@@ -157,6 +164,12 @@ export function performSearch(
   };
 
   removeBlinkingStyles();
+  (window as unknown as { __accessibleFindStyles?: any }).__accessibleFindStyles = {
+    highlightBgColor,
+    highlightTextColor,
+    outlineColor,
+    outlineWidth,
+  };
   setMatches([]);
   setCurrentIndex(null);
   if (!searchTerm) {
@@ -192,6 +205,17 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
   const getMatches = (): HTMLElement[] =>
     (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).
       __accessibleFindMatches ?? [];
+  const styles = (window as unknown as { __accessibleFindStyles?: {
+    highlightBgColor: string;
+    highlightTextColor: string;
+    outlineColor: string;
+    outlineWidth: number;
+  } }).__accessibleFindStyles ?? {
+    highlightBgColor: '#ffff00',
+    highlightTextColor: '#000000',
+    outlineColor: '#ff8c00',
+    outlineWidth: 3,
+  };
   const setCurrentIndex = (idx: number | null): void => {
     (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
       __accessibleFindCurrentIndex = idx;
@@ -214,10 +238,13 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
   }
   setCurrentIndex(idx);
   // Apply selection outline and scroll
-  matches.forEach((m) => m.style.removeProperty("outline"));
+  matches.forEach((m) => {
+    m.style.removeProperty("outline");
+    m.style.removeProperty("border");
+  });
   const el = matches[idx];
   if (el) {
-    el.style.border = "5px solid orange";
+    el.style.outline = `${styles.outlineWidth}px solid ${styles.outlineColor}`;
     el.scrollIntoView({ block: "center", inline: "nearest" });
   }
   return { count, currentIndex: idx };

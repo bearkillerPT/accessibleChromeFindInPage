@@ -9,7 +9,7 @@
     "storage"
   ],
   "action": {
-    "default_popup": "src/popup/index.html"
+    "default_popup": "dist/popup-app/index.html"
   },
   "background": {
     "service_worker": "dist/background/index.js",
