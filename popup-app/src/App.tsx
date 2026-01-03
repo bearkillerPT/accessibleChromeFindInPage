@@ -8,6 +8,7 @@ type Settings = {
   highlightTextColor: string;
   outlineColor: string;
   outlineWidth: number;
+  matchFontSize: number;
 };
 
 type FindResponse = {
@@ -140,6 +141,12 @@ export default function App() {
           <input type="number" className="border rounded px-2 py-1 text-sm" min={1}
             value={settings.outlineWidth}
             onChange={(e) => setSettings({ ...settings!, outlineWidth: Number(e.target.value) })}
+          />
+
+          <label className="text-xs">Match font size (px)</label>
+          <input type="number" className="border rounded px-2 py-1 text-sm" min={8}
+            value={settings.matchFontSize}
+            onChange={(e) => setSettings({ ...settings!, matchFontSize: Number(e.target.value) })}
           />
 
           <div className="col-span-2 flex justify-end gap-2 mt-2">

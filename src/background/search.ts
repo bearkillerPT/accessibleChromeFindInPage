@@ -6,13 +6,13 @@ export function blinkLinesWithSearchTerm(
   tabId: number,
   settings: Settings
 ): Promise<{ blinkIntervalId: number | null; count: number; currentIndex: number | null }> {
-  const { blinkInterval, numBlinks, numSurroundingWords, highlightBgColor, highlightTextColor, outlineColor, outlineWidth } = settings;
+  const { blinkInterval, numBlinks, numSurroundingWords, highlightBgColor, highlightTextColor, outlineColor, outlineWidth, matchFontSize } = settings;
   return new Promise((resolve) => {
     chrome.scripting.executeScript(
       {
         target: { tabId },
         func: performSearch,
-        args: [searchTerm, blinkInterval, numBlinks, numSurroundingWords, highlightBgColor, highlightTextColor, outlineColor, outlineWidth],
+        args: [searchTerm, blinkInterval, numBlinks, numSurroundingWords, highlightBgColor, highlightTextColor, outlineColor, outlineWidth, matchFontSize],
       },
       (results) => {
         const first = results && results[0] ? results[0] : undefined;

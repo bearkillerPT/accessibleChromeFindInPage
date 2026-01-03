@@ -8,6 +8,7 @@ declare global {
       highlightTextColor: string;
       outlineColor: string;
       outlineWidth: number;
+      matchFontSize: number;
     };
   }
 }

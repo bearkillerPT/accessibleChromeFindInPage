@@ -6,6 +6,7 @@ export interface Settings {
   highlightTextColor: string;
   outlineColor: string;
   outlineWidth: number; // in px
+  matchFontSize: number; // in px
 }
 
 export const defaultSettings: Settings = {
@@ -16,6 +17,7 @@ export const defaultSettings: Settings = {
   highlightTextColor: '#000000',
   outlineColor: '#ff8c00',
   outlineWidth: 3,
+  matchFontSize: 20,
 };
 
 export function getSettings(): Promise<Settings> {

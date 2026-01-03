@@ -6,7 +6,8 @@ export function performSearch(
   highlightBgColor: string,
   highlightTextColor: string,
   outlineColor: string,
-  outlineWidth: number
+  outlineWidth: number,
+  matchFontSize: number
 ): { blinkIntervalId: number | null; count: number; currentIndex: number | null } {
   // Helpers to manage the blink interval id stored on window
   const getBlinkIntervalId = (): number | null =>
@@ -155,6 +156,10 @@ export function performSearch(
       parent.replaceChild(div, element);
       const blinkElements = document.querySelectorAll(".blink");
       setElementsHighlighted(blinkElements, true);
+      // Apply match font size once; do not toggle during blink cycles
+      blinkElements.forEach((el) => {
+        (el as HTMLElement).style.fontSize = `${matchFontSize}px`;
+      });
     } else if (element.nodeType === Node.ELEMENT_NODE) {
       const el = element as Element;
       for (let i = 0; i < el.childNodes.length; i++) {
@@ -169,6 +174,7 @@ export function performSearch(
     highlightTextColor,
     outlineColor,
     outlineWidth,
+    matchFontSize,
   };
   setMatches([]);
   setCurrentIndex(null);
