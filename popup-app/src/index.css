@@ -6,6 +6,12 @@
   color-scheme: light;
 }
 
+/* Keep the popup compact and predictable inside an iframe */
+html, body {
+  height: 100%;
+}
 body {
-  display: flex;
+  display: block;
+  margin: 0;
+  background: #fff;
 }

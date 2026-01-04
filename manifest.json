@@ -9,9 +9,7 @@
     "storage",
     "tabs"
   ],
-  "action": {
-    "default_popup": "dist/popup-app/index.html"
-  },
+  "action": {},
   "background": {
     "service_worker": "dist/background/index.js",
     "type": "module"

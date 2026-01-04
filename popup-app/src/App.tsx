@@ -71,14 +71,24 @@ export default function App() {
     );
   }, []);
 
-  // Autofocus the search input when the popup opens
+  // Autofocus the search input when the popup opens and respond to focus requests
   useEffect(() => {
     // Focus and select any existing text for quick replacement
     inputRef.current?.focus();
     inputRef.current?.select();
+
+    const onMessage = (e: MessageEvent) => {
+      const data = e?.data as { type?: string } | undefined;
+      if (data && data.type === "focusInput") {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
   }, []);
 
-  // Clear search and close popup on Escape
+  // Clear search and close overlay on Escape
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -87,14 +97,13 @@ export default function App() {
           chrome.runtime.sendMessage(
             { action: "findInPage", searchTerm: "" },
             () => {
-              // Best-effort close; extension popups allow window.close()
               setSearchTerm("");
-              window.close();
+              chrome.runtime.sendMessage({ action: "closeOverlay" });
             }
           );
         } catch {
           setSearchTerm("");
-          window.close();
+          chrome.runtime.sendMessage({ action: "closeOverlay" });
         }
       }
     };
@@ -160,8 +169,35 @@ export default function App() {
     );
   }
 
+  function onPrev() {
+    navigate("prev");
+  }
+
+  function onNext() {
+    navigate("next");
+  }
+
+  function onClose() {
+    try {
+      chrome.runtime.sendMessage({ action: "findInPage", searchTerm: "" }, () => {
+        setSearchTerm("");
+        chrome.runtime.sendMessage({ action: "closeOverlay" });
+      });
+    } catch {
+      setSearchTerm("");
+      chrome.runtime.sendMessage({ action: "closeOverlay" });
+    }
+  }
+
+  function onInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (e.shiftKey) onPrev(); else onNext();
+    }
+  }
+
   return (
-    <div className="flex flex-col p-2 gap-2">
+    <div className="flex flex-col p-2 gap-2" style={{ maxHeight: 232, overflow: 'auto' }}>
       {needsShortcut && (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs rounded p-2">
           <div className="flex items-center justify-between gap-2">
@@ -211,8 +247,9 @@ export default function App() {
           autoFocus
           value={searchTerm}
           onChange={(e) => onTermChange(e.target.value)}
+          onKeyDown={onInputKeyDown}
           placeholder="Find in Page"
-          className="flex-1 border rounded px-2 py-1 text-sm"
+          className="flex-1 min-w-0 border rounded px-2 py-1 text-sm"
         />
         <div className="flex items-center gap-1">
           {findMutation.isPending ? (
@@ -229,7 +266,7 @@ export default function App() {
           <button
             className="border rounded px-1 text-xs"
             title="Previous"
-            onClick={() => navigate("prev")}
+            onClick={onPrev}
             disabled={count === 0 || findMutation.isPending}
           >
             ▲
@@ -237,10 +274,17 @@ export default function App() {
           <button
             className="border rounded px-1 text-xs"
             title="Next"
-            onClick={() => navigate("next")}
+            onClick={onNext}
             disabled={count === 0 || findMutation.isPending}
           >
             ▼
+          </button>
+          <button
+            className="border rounded px-2 text-sm ml-1"
+            title="Close"
+            onClick={onClose}
+          >
+            ✖
           </button>
         </div>
       </div>

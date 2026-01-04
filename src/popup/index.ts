@@ -48,9 +48,20 @@ document.addEventListener('DOMContentLoaded', function () {
   const matchCountEl = document.getElementById('matchCount') as HTMLSpanElement;
   const prevButton = document.getElementById('prevButton') as HTMLButtonElement;
   const nextButton = document.getElementById('nextButton') as HTMLButtonElement;
+
+  function handleFindKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      navigate(e.shiftKey ? 'prev' : 'next');
+    }
+  }
+  function handlePrevClick() { navigate('prev'); }
+  function handleNextClick() { navigate('next'); }
+
   findInput.addEventListener('input', handleFindInputChange);
-  prevButton.addEventListener('click', () => navigate('prev'));
-  nextButton.addEventListener('click', () => navigate('next'));
+  findInput.addEventListener('keydown', handleFindKeyDown);
+  prevButton.addEventListener('click', handlePrevClick);
+  nextButton.addEventListener('click', handleNextClick);
 
   // Autofocus the search input when the popup opens
   try {
