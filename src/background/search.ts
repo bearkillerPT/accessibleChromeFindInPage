@@ -1,5 +1,5 @@
 import type { Settings } from './settings.js';
-import { performSearch, navigateMatches } from '../content/logic.js';
+import { performSearch, navigateMatches, cancelSearchAndCleanup } from '../content/logic.js';
 
 export function blinkLinesWithSearchTerm(
   searchTerm: string,
@@ -8,22 +8,33 @@ export function blinkLinesWithSearchTerm(
 ): Promise<{ blinkIntervalId: number | null; count: number; currentIndex: number | null }> {
   const { blinkInterval, numBlinks, numSurroundingWords, highlightBgColor, highlightTextColor, outlineColor, outlineWidth, matchFontSize } = settings;
   return new Promise((resolve) => {
+    // First cancel any ongoing search and remove existing spans immediately
     chrome.scripting.executeScript(
       {
         target: { tabId },
-        func: performSearch,
-        args: [searchTerm, blinkInterval, numBlinks, numSurroundingWords, highlightBgColor, highlightTextColor, outlineColor, outlineWidth, matchFontSize],
+        func: cancelSearchAndCleanup,
+        args: [],
       },
-      (results) => {
-        const first = results && results[0] ? results[0] : undefined;
-        resolve(
-          first
-            ? (first.result as {
-                blinkIntervalId: number | null;
-                count: number;
-                currentIndex: number | null;
-              })
-            : { blinkIntervalId: null, count: 0, currentIndex: null }
+      () => {
+        // Then start the new search
+        chrome.scripting.executeScript(
+          {
+            target: { tabId },
+            func: performSearch,
+            args: [searchTerm, blinkInterval, numBlinks, numSurroundingWords, highlightBgColor, highlightTextColor, outlineColor, outlineWidth, matchFontSize],
+          },
+          (results) => {
+            const first = results && results[0] ? results[0] : undefined;
+            resolve(
+              first
+                ? (first.result as {
+                    blinkIntervalId: number | null;
+                    count: number;
+                    currentIndex: number | null;
+                  })
+                : { blinkIntervalId: null, count: 0, currentIndex: null }
+            );
+          }
         );
       }
     );

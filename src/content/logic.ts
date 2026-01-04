@@ -1,4 +1,4 @@
-export function performSearch(
+export async function performSearch(
   searchTerm: string,
   blinkInterval: number,
   numBlinks: number,
@@ -8,7 +8,16 @@ export function performSearch(
   outlineColor: string,
   outlineWidth: number,
   matchFontSize: number
-): { blinkIntervalId: number | null; count: number; currentIndex: number | null } {
+): Promise<{ blinkIntervalId: number | null; count: number; currentIndex: number | null }> {
+  // Cancellation token management
+  const getActiveToken = (): number | null =>
+    (window as unknown as { __accessibleFindActiveToken?: number | null }).
+      __accessibleFindActiveToken ?? null;
+  const setActiveToken = (token: number | null): void => {
+    (window as unknown as { __accessibleFindActiveToken?: number | null }).
+      __accessibleFindActiveToken = token;
+  };
+  const generateToken = (): number => Math.floor(Date.now() ^ Math.random() * 1e9);
   // Helpers to manage the blink interval id stored on window
   const getBlinkIntervalId = (): number | null =>
     (window as unknown as { __accessibleFindBlinkIntervalId?: number | null })
@@ -27,6 +36,11 @@ export function performSearch(
     setBlinkIntervalId(null);
   }
 
+  // Set a new active token; older searches will stop when they detect mismatch
+  const myToken = generateToken();
+  setActiveToken(myToken);
+  const isCancelled = (): boolean => getActiveToken() !== myToken;
+
   const removeBlinkingStyles = (): void => {
     const blinkingElements = document.querySelectorAll(
       ".blink, .blink-off"
@@ -38,6 +52,61 @@ export function performSearch(
     });
   };
 
+  // Visibility and exclusion helpers to align with Chrome's find-in-page behavior
+  const isExcludedTag = (el: Element): boolean => {
+    const tag = el.tagName.toUpperCase();
+    return (
+      tag === "SCRIPT" ||
+      tag === "STYLE" ||
+      tag === "NOSCRIPT" ||
+      tag === "TEMPLATE" ||
+      tag === "HEAD" ||
+      tag === "META" ||
+      tag === "LINK"
+    );
+  };
+
+  const isElementActuallyVisible = (el: Element): boolean => {
+    // Walk up the ancestor chain to detect hiddenness similar to Chrome
+    let cur: Element | null = el;
+    while (cur && cur instanceof Element) {
+      const h = cur as HTMLElement;
+      if (h.hidden) return false;
+      if (cur.hasAttribute("inert")) return false;
+      const ariaHidden = cur.getAttribute("aria-hidden");
+      if (ariaHidden === "true") return false;
+
+      const style = window.getComputedStyle(cur);
+      if (style.display === "none" || style.visibility === "hidden") return false;
+      if (parseFloat(style.opacity || "1") === 0) return false;
+      const contentVisibility = style.getPropertyValue("content-visibility");
+      if (contentVisibility === "hidden") return false;
+
+      cur = cur.parentElement;
+    }
+
+    // Element itself must have a non-empty rect with area
+    const rects = (el as HTMLElement).getClientRects();
+    if (rects.length === 0) return false;
+    let hasNonZeroRect = false;
+    for (let i = 0; i < rects.length; i++) {
+      if (rects[i].width > 0 && rects[i].height > 0) {
+        hasNonZeroRect = true;
+        break;
+      }
+    }
+    if (!hasNonZeroRect) return false;
+
+    return true;
+  };
+
+  const shouldSkipElement = (el: Element): boolean => {
+    if (isExcludedTag(el)) return true;
+    // Skip entire subtrees that are not visible
+    if (!isElementActuallyVisible(el)) return true;
+    return false;
+  };
+
   const getMatches = (): HTMLElement[] =>
     (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).
       __accessibleFindMatches ?? [];
@@ -46,11 +115,7 @@ export function performSearch(
     (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).
       __accessibleFindMatches = m;
   };
-
-  const getCurrentIndex = (): number | null =>
-    (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
-      __accessibleFindCurrentIndex ?? null;
-
+  
   const setCurrentIndex = (idx: number | null): void => {
     (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
       __accessibleFindCurrentIndex = idx;
@@ -90,6 +155,11 @@ export function performSearch(
     let currentBlinks = numBlinks * 2;
 
     const blinkIntervalId = window.setInterval(() => {
+      if (isCancelled()) {
+        window.clearInterval(blinkIntervalId);
+        setBlinkIntervalId(null);
+        return;
+      }
       if (currentBlinks <= 0) {
         window.clearInterval(blinkIntervalId);
         setBlinkIntervalId(null);
@@ -107,65 +177,79 @@ export function performSearch(
     return blinkIntervalId;
   };
 
-  const findAndMatchText = (element: Node, searchText: string): void => {
-    if (element.nodeType === Node.TEXT_NODE) {
-      const text = (element.textContent ?? "").trim();
+  // Async, chunked traversal to allow cancellation to interrupt mid-search
+  const walkAndMatchAsync = async (
+    root: Element,
+    searchText: string
+  ): Promise<{ ops: Array<{ parent: HTMLElement; node: Node; html: string }> }> => {
+    const queue: Node[] = Array.from(root.childNodes);
+    const regex = new RegExp(searchText, "gi");
+    const ops: Array<{ parent: HTMLElement; node: Node; html: string }> = [];
+
+    const processTextNode = (node: Node): void => {
+      const parentEl = node.parentElement;
+      if (!parentEl || shouldSkipElement(parentEl)) return;
+      const raw = node.textContent ?? "";
+      const text = raw.trim();
       if (!text) return;
       const contentStrings = text.split(" ");
-      const searchTermRegex = new RegExp(searchText, "gi");
+      let changed = false;
       const shouldWrapOff = (token: string): boolean => {
         return (
           !!token &&
           !token.includes('class="blink') &&
           !token.includes('<span class="blink') &&
-          !token.match(searchTermRegex)
+          !!token.match(regex) === false
         );
       };
       for (let i = 0; i < contentStrings.length; i++) {
         const token = contentStrings[i];
         if (token.includes('<span class="blink')) continue;
-        if (token.match(searchTermRegex)) {
-          contentStrings[i] = token.replace(
-            searchTermRegex,
-            '<span class="blink">$&</span>'
-          );
+        if (token.match(regex)) {
+          contentStrings[i] = token.replace(regex, '<span class="blink">$&</span>');
+          changed = true;
           for (let j = 1; j <= numSurroundingWords; j++) {
             const left = i - j;
             const right = i + j;
             if (left >= 0 && shouldWrapOff(contentStrings[left])) {
-              contentStrings[
-                left
-              ] = `<span class="blink-off">${contentStrings[left]}</span>`;
+              contentStrings[left] = `<span class="blink-off">${contentStrings[left]}</span>`;
+              changed = true;
             }
-            if (
-              right < contentStrings.length &&
-              shouldWrapOff(contentStrings[right])
-            ) {
-              contentStrings[
-                right
-              ] = `<span class="blink-off">${contentStrings[right]}</span>`;
+            if (right < contentStrings.length && shouldWrapOff(contentStrings[right])) {
+              contentStrings[right] = `<span class="blink-off">${contentStrings[right]}</span>`;
+              changed = true;
             }
           }
         }
       }
-
-      const div = document.createElement("div");
-      div.innerHTML = contentStrings.join(" ");
-      const parent = element.parentNode as HTMLElement | null;
+      if (!changed) return;
+      const spanHTML = contentStrings.join(" ");
+      const parent = node.parentNode as HTMLElement | null;
       if (!parent) return;
-      parent.replaceChild(div, element);
-      const blinkElements = document.querySelectorAll(".blink");
-      setElementsHighlighted(blinkElements, true);
-      // Apply match font size once; do not toggle during blink cycles
-      blinkElements.forEach((el) => {
-        (el as HTMLElement).style.fontSize = `${matchFontSize}px`;
-      });
-    } else if (element.nodeType === Node.ELEMENT_NODE) {
-      const el = element as Element;
-      for (let i = 0; i < el.childNodes.length; i++) {
-        findAndMatchText(el.childNodes[i], searchText);
+      ops.push({ parent, node, html: spanHTML });
+    };
+
+    const CHUNK = 600; // nodes per tick; smaller chunk for faster cancellation
+    while (queue.length) {
+      if (isCancelled()) return { ops: [] };
+      let processed = 0;
+      while (queue.length && processed < CHUNK) {
+        const node = queue.shift()!;
+        if (node.nodeType === Node.TEXT_NODE) {
+          processTextNode(node);
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          const el = node as Element;
+          if (!shouldSkipElement(el)) {
+            for (let i = 0; i < el.childNodes.length; i++) {
+              queue.push(el.childNodes[i]);
+            }
+          }
+        }
+        processed++;
       }
+      await new Promise((r) => setTimeout(r, 0));
     }
+    return { ops };
   };
 
   removeBlinkingStyles();
@@ -181,7 +265,25 @@ export function performSearch(
   if (!searchTerm) {
     return { blinkIntervalId: null, count: 0, currentIndex: null };
   }
-  findAndMatchText(document.body, searchTerm);
+  // Run traversal in chunks so cancellation can interrupt promptly
+  const { ops } = await walkAndMatchAsync(document.body, searchTerm);
+  if (isCancelled()) {
+    return { blinkIntervalId: null, count: 0, currentIndex: null };
+  }
+  // Apply all queued DOM changes in one pass to avoid intermediate highlights
+  for (let i = 0; i < ops.length; i++) {
+    const { parent, node, html } = ops[i];
+    const spanContainer = document.createElement("span");
+    spanContainer.innerHTML = html;
+    // parent may be detached; guard
+    if (!parent || !node || !parent.contains(node)) continue;
+    parent.replaceChild(spanContainer, node);
+  }
+  const blinkElementsApplied = document.querySelectorAll(".blink");
+  setElementsHighlighted(blinkElementsApplied, true);
+  blinkElementsApplied.forEach((el) => {
+    (el as HTMLElement).style.fontSize = `${matchFontSize}px`;
+  });
   const matches = Array.from(document.querySelectorAll(".blink")) as HTMLElement[];
   setMatches(matches);
   // Determine default selection closest to viewport center
@@ -205,6 +307,41 @@ export function performSearch(
   applyCurrentSelection(defaultIndex);
   const id = applyBlinkingStyles();
   return { blinkIntervalId: id, count: matches.length, currentIndex: defaultIndex };
+}
+
+export function cancelSearchAndCleanup(): void {
+  // Invalidate any ongoing search by setting a new token
+  const setActiveToken = (token: number | null): void => {
+    (window as unknown as { __accessibleFindActiveToken?: number | null }).
+      __accessibleFindActiveToken = token;
+  };
+  setActiveToken(Math.floor(Date.now() ^ Math.random() * 1e9));
+  const getBlinkIntervalId = (): number | null =>
+    (window as unknown as { __accessibleFindBlinkIntervalId?: number | null }).
+      __accessibleFindBlinkIntervalId ?? null;
+  const setBlinkIntervalId = (id: number | null): void => {
+    (
+      window as unknown as { __accessibleFindBlinkIntervalId?: number | null }
+    ).__accessibleFindBlinkIntervalId = id;
+  };
+  const prevBlinkIntervalId = getBlinkIntervalId();
+  if (typeof prevBlinkIntervalId === "number") {
+    window.clearInterval(prevBlinkIntervalId);
+    setBlinkIntervalId(null);
+  }
+  const removeBlinkingStyles = (): void => {
+    const blinkingElements = document.querySelectorAll(
+      ".blink, .blink-off"
+    );
+    blinkingElements.forEach((element) => {
+      const parent = element.parentNode as HTMLElement | null;
+      if (!parent) return;
+      parent.innerHTML = parent.textContent ?? "";
+    });
+  };
+  removeBlinkingStyles();
+  (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).__accessibleFindMatches = [];
+  (window as unknown as { __accessibleFindCurrentIndex?: number | null }).__accessibleFindCurrentIndex = null;
 }
 
 export function navigateMatches(direction: "next" | "prev"): { count: number; currentIndex: number | null } {

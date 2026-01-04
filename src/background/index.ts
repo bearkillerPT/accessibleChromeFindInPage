@@ -2,6 +2,9 @@ import { defaultSettings, getSettings, setSettings } from './settings.js';
 import type { Settings } from './settings.js';
 import { blinkLinesWithSearchTerm, navigateMatch } from './search.js';
 
+// Track active search requests per tab to ignore stale results
+const activeSearchByTab = new Map<number, number>();
+
 let settings: Settings = { ...defaultSettings };
 
 (async function init(): Promise<void> {
@@ -50,7 +53,15 @@ chrome.runtime.onMessage.addListener(
           sendResponse({ ok: false, error: 'No active tab' });
           return;
         }
+        const requestId = Math.floor(Date.now() ^ Math.random() * 1e9);
+        activeSearchByTab.set(tabId, requestId);
         blinkLinesWithSearchTerm(searchTerm, tabId, settings).then((result) => {
+          const latestId = activeSearchByTab.get(tabId);
+          if (latestId !== requestId) {
+            // A newer request superseded this one; return a cancelled response
+            sendResponse({ ok: false, cancelled: true });
+            return;
+          }
           sendResponse({ ok: true, ...result });
         });
       });

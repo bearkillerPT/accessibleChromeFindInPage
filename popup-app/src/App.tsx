@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 
 type Settings = {
   blinkInterval: number;
@@ -26,18 +27,48 @@ type NavigateResponse = {
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [open, setOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [count, setCount] = useState(0);
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
   const [needsShortcut, setNeedsShortcut] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // No debounce; background/page handle cancellation
+
+  const findMutation = useMutation<FindResponse | null, unknown, string>({
+    mutationFn: async (term: string) =>
+      await new Promise<FindResponse | null>((resolve) => {
+        try {
+          chrome.runtime.sendMessage(
+            { action: "findInPage", searchTerm: term },
+            (response: FindResponse | null) => {
+              resolve(response ?? null);
+            }
+          );
+        } catch {
+          resolve({ ok: false, count: 0, currentIndex: null });
+        }
+      }),
+    onSuccess: (response) => {
+      if (response && response.ok) {
+        setCount(response.count ?? 0);
+        setCurrentIndex(
+          typeof response.currentIndex === "number"
+            ? response.currentIndex!
+            : null
+        );
+      }
+    },
+  });
 
   useEffect(() => {
-    chrome.runtime.sendMessage({ action: 'getSettings' }, (response: Settings | null) => {
-      if (response) {
-        setSettings(response);
+    chrome.runtime.sendMessage(
+      { action: "getSettings" },
+      (response: Settings | null) => {
+        if (response) {
+          setSettings(response);
+        }
       }
-    });
+    );
   }, []);
 
   // Autofocus the search input when the popup opens
@@ -50,29 +81,32 @@ export default function App() {
   // Clear search and close popup on Escape
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         // Reset the search in the active tab
         try {
-          chrome.runtime.sendMessage({ action: 'findInPage', searchTerm: '' }, () => {
-            // Best-effort close; extension popups allow window.close()
-            setSearchTerm('');
-            window.close();
-          });
+          chrome.runtime.sendMessage(
+            { action: "findInPage", searchTerm: "" },
+            () => {
+              // Best-effort close; extension popups allow window.close()
+              setSearchTerm("");
+              window.close();
+            }
+          );
         } catch {
-          setSearchTerm('');
+          setSearchTerm("");
           window.close();
         }
       }
     };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
   // Clear search when the popup is closed/unmounted
   useEffect(() => {
     return () => {
       try {
-        chrome.runtime.sendMessage({ action: 'findInPage', searchTerm: '' });
+        chrome.runtime.sendMessage({ action: "findInPage", searchTerm: "" });
       } catch {
         // Ignore if runtime is unavailable, e.g., during unload
       }
@@ -83,8 +117,9 @@ export default function App() {
     // Check whether the keyboard shortcut is assigned; if not, prompt the user
     try {
       chrome.commands.getAll((cmds) => {
-        const openPopup = cmds?.find((c) => c.name === 'open_popup');
-        const hasShortcut = !!openPopup?.shortcut && openPopup.shortcut.trim().length > 0;
+        const openPopup = cmds?.find((c) => c.name === "open_popup");
+        const hasShortcut =
+          !!openPopup?.shortcut && openPopup.shortcut.trim().length > 0;
         setNeedsShortcut(!hasShortcut);
       });
     } catch {
@@ -96,31 +131,33 @@ export default function App() {
 
   function saveSettings() {
     if (!settings) return;
-    chrome.runtime.sendMessage({ action: 'setSettings', settings }, () => {
+    chrome.runtime.sendMessage({ action: "setSettings", settings }, () => {
       setOpen(false);
       // If there's an active search term, re-run search to apply new styles immediately
       if (searchTerm && searchTerm.trim().length > 0) {
-        chrome.runtime.sendMessage({ action: 'findInPage', searchTerm }, (response: FindResponse | null) => {
-          setCount(response?.count ?? 0);
-          setCurrentIndex(typeof response?.currentIndex === 'number' ? response!.currentIndex! : null);
-        });
+        findMutation.mutate(searchTerm);
       }
     });
   }
 
   function onTermChange(v: string) {
     setSearchTerm(v);
-    chrome.runtime.sendMessage({ action: 'findInPage', searchTerm: v }, (response: FindResponse | null) => {
-      setCount(response?.count ?? 0);
-      setCurrentIndex(typeof response?.currentIndex === 'number' ? response!.currentIndex! : null);
-    });
+    // Send immediately; cancellation handled in background/page
+    findMutation.mutate(v);
   }
 
-  function navigate(direction: 'next' | 'prev') {
-    chrome.runtime.sendMessage({ action: 'navigateMatch', direction }, (response: NavigateResponse | null) => {
-      setCount(response?.count ?? 0);
-      setCurrentIndex(typeof response?.currentIndex === 'number' ? response!.currentIndex! : null);
-    });
+  function navigate(direction: "next" | "prev") {
+    chrome.runtime.sendMessage(
+      { action: "navigateMatch", direction },
+      (response: NavigateResponse | null) => {
+        setCount(response?.count ?? 0);
+        setCurrentIndex(
+          typeof response?.currentIndex === "number"
+            ? response!.currentIndex!
+            : null
+        );
+      }
+    );
   }
 
   return (
@@ -128,19 +165,36 @@ export default function App() {
       {needsShortcut && (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs rounded p-2">
           <div className="flex items-center justify-between gap-2">
-            <span>Set a keyboard shortcut for <strong>"Open Accessible Find In Page popup"</strong> (not "Activate the extension").</span>
+            <span>
+              Set a keyboard shortcut for{" "}
+              <strong>"Open Accessible Find In Page popup"</strong> (not
+              "Activate the extension").
+            </span>
             <button
               className="border rounded px-2 py-0.5 hover:bg-yellow-100"
               onClick={() => {
                 const ua = navigator.userAgent.toLowerCase();
-                const url = ua.includes('edg/') ? 'edge://extensions/shortcuts' : (ua.includes('vivaldi') ? 'vivaldi://extensions/shortcuts' : 'chrome://extensions/shortcuts');
+                const url = ua.includes("edg/")
+                  ? "edge://extensions/shortcuts"
+                  : ua.includes("vivaldi")
+                  ? "vivaldi://extensions/shortcuts"
+                  : "chrome://extensions/shortcuts";
 
-                chrome.runtime.sendMessage({ action: 'openShortcuts' }, async (res: { ok: boolean; error?: string } | null) => {
-                  if (res && res.ok) return;
-                  alert('Please open ' + url + ' and set a shortcut for "Open Accessible Find In Page popup" (not "Activate the extension").');
-                });
+                chrome.runtime.sendMessage(
+                  { action: "openShortcuts" },
+                  async (res: { ok: boolean; error?: string } | null) => {
+                    if (res && res.ok) return;
+                    alert(
+                      "Please open " +
+                        url +
+                        ' and set a shortcut for "Open Accessible Find In Page popup" (not "Activate the extension").'
+                    );
+                  }
+                );
               }}
-            >Open shortcut settings</button>
+            >
+              Open shortcut settings
+            </button>
           </div>
         </div>
       )}
@@ -149,7 +203,9 @@ export default function App() {
           className="text-xl"
           title="Settings"
           onClick={() => setOpen((o) => !o)}
-        >⚙️</button>
+        >
+          ⚙️
+        </button>
         <input
           ref={inputRef}
           autoFocus
@@ -159,21 +215,33 @@ export default function App() {
           className="flex-1 border rounded px-2 py-1 text-sm"
         />
         <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-700 min-w-12 text-right">
-            {currentIndex !== null && count > 0 ? `${currentIndex + 1}/${count}` : `${count}/${count}`}
-          </span>
+          {findMutation.isPending ? (
+            <span className="text-xs text-gray-600 min-w-12 text-right inline-flex items-center justify-end">
+              <span className="inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            </span>
+          ) : (
+            <span className="text-xs text-gray-700 min-w-12 text-right">
+              {currentIndex !== null && count > 0
+                ? `${currentIndex + 1}/${count}`
+                : `${count}/${count}`}
+            </span>
+          )}
           <button
             className="border rounded px-1 text-xs"
             title="Previous"
-            onClick={() => navigate('prev')}
-            disabled={count === 0}
-          >▲</button>
+            onClick={() => navigate("prev")}
+            disabled={count === 0 || findMutation.isPending}
+          >
+            ▲
+          </button>
           <button
             className="border rounded px-1 text-xs"
             title="Next"
-            onClick={() => navigate('next')}
-            disabled={count === 0}
-          >▼</button>
+            onClick={() => navigate("next")}
+            disabled={count === 0 || findMutation.isPending}
+          >
+            ▼
+          </button>
         </div>
       </div>
 
@@ -181,52 +249,115 @@ export default function App() {
         <div className="border rounded p-2 grid grid-cols-2 gap-2">
           <label className="text-sm col-span-2 font-semibold">Blinking</label>
           <label className="text-xs">Interval (ms)</label>
-          <input type="number" className="border rounded px-2 py-1 text-sm" min={100} step={50}
+          <input
+            type="number"
+            className="border rounded px-2 py-1 text-sm"
+            min={100}
+            step={50}
             value={settings.blinkInterval}
-            onChange={(e) => setSettings({ ...settings!, blinkInterval: Number(e.target.value) })}
+            onChange={(e) =>
+              setSettings({
+                ...settings!,
+                blinkInterval: Number(e.target.value),
+              })
+            }
           />
           <label className="text-xs"># Blinks</label>
-          <input type="number" className="border rounded px-2 py-1 text-sm" min={1}
+          <input
+            type="number"
+            className="border rounded px-2 py-1 text-sm"
+            min={1}
             value={settings.numBlinks}
-            onChange={(e) => setSettings({ ...settings!, numBlinks: Number(e.target.value) })}
+            onChange={(e) =>
+              setSettings({ ...settings!, numBlinks: Number(e.target.value) })
+            }
           />
           <label className="text-xs">Surrounding words</label>
-          <input type="number" className="border rounded px-2 py-1 text-sm" min={0}
+          <input
+            type="number"
+            className="border rounded px-2 py-1 text-sm"
+            min={0}
             value={settings.numSurroundingWords}
-            onChange={(e) => setSettings({ ...settings!, numSurroundingWords: Number(e.target.value) })}
+            onChange={(e) =>
+              setSettings({
+                ...settings!,
+                numSurroundingWords: Number(e.target.value),
+              })
+            }
           />
 
-          <label className="text-sm col-span-2 font-semibold mt-1">Colors</label>
+          <label className="text-sm col-span-2 font-semibold mt-1">
+            Colors
+          </label>
           <label className="text-xs">Highlight background</label>
-          <input type="color" className="border rounded px-2 py-1"
+          <input
+            type="color"
+            className="border rounded px-2 py-1"
             value={settings.highlightBgColor}
-            onChange={(e) => setSettings({ ...settings!, highlightBgColor: e.target.value })}
+            onChange={(e) =>
+              setSettings({ ...settings!, highlightBgColor: e.target.value })
+            }
           />
           <label className="text-xs">Highlight text</label>
-          <input type="color" className="border rounded px-2 py-1"
+          <input
+            type="color"
+            className="border rounded px-2 py-1"
             value={settings.highlightTextColor}
-            onChange={(e) => setSettings({ ...settings!, highlightTextColor: e.target.value })}
+            onChange={(e) =>
+              setSettings({ ...settings!, highlightTextColor: e.target.value })
+            }
           />
           <label className="text-xs">Border color</label>
-          <input type="color" className="border rounded px-2 py-1"
+          <input
+            type="color"
+            className="border rounded px-2 py-1"
             value={settings.outlineColor}
-            onChange={(e) => setSettings({ ...settings!, outlineColor: e.target.value })}
+            onChange={(e) =>
+              setSettings({ ...settings!, outlineColor: e.target.value })
+            }
           />
           <label className="text-xs">Border width (px)</label>
-          <input type="number" className="border rounded px-2 py-1 text-sm" min={1}
+          <input
+            type="number"
+            className="border rounded px-2 py-1 text-sm"
+            min={1}
             value={settings.outlineWidth}
-            onChange={(e) => setSettings({ ...settings!, outlineWidth: Number(e.target.value) })}
+            onChange={(e) =>
+              setSettings({
+                ...settings!,
+                outlineWidth: Number(e.target.value),
+              })
+            }
           />
 
           <label className="text-xs">Match font size (px)</label>
-          <input type="number" className="border rounded px-2 py-1 text-sm" min={8}
+          <input
+            type="number"
+            className="border rounded px-2 py-1 text-sm"
+            min={8}
             value={settings.matchFontSize}
-            onChange={(e) => setSettings({ ...settings!, matchFontSize: Number(e.target.value) })}
+            onChange={(e) =>
+              setSettings({
+                ...settings!,
+                matchFontSize: Number(e.target.value),
+              })
+            }
           />
 
           <div className="col-span-2 flex justify-end gap-2 mt-2">
-            <button className="border rounded px-3 py-1 text-sm" onClick={() => setOpen(false)}>Close</button>
-            <button className="bg-blue-600 text-white rounded px-3 py-1 text-sm disabled:opacity-50" onClick={saveSettings} disabled={!canSave}>Save</button>
+            <button
+              className="border rounded px-3 py-1 text-sm"
+              onClick={() => setOpen(false)}
+            >
+              Close
+            </button>
+            <button
+              className="bg-blue-600 text-white rounded px-3 py-1 text-sm disabled:opacity-50"
+              onClick={saveSettings}
+              disabled={!canSave}
+            >
+              Save
+            </button>
           </div>
         </div>
       )}
