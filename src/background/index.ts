@@ -166,16 +166,61 @@ function injectOrFocusOverlay(width: number, height: number): void {
     const style = document.createElement('style');
     style.textContent = `
       :host { all: initial; }
-      .panel { font-family: system-ui, sans-serif; width: ${width}px; background: #fff; border: 1px solid #ddd; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); display: flex; flex-direction: column; padding: 8px; gap: 8px; box-sizing: border-box; }
+      .panel {
+        font-family: system-ui, sans-serif;
+        width: ${width}px;
+        background: #0f172a; /* slate-900 */
+        color: #e5e7eb; /* gray-200 */
+        border: 1px solid #334155; /* slate-700 */
+        border-radius: 6px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+        display: flex;
+        flex-direction: column;
+        padding: 8px;
+        gap: 8px;
+        box-sizing: border-box;
+      }
       .row { display: flex; align-items: center; gap: 8px; min-width: 0; }
-      input { flex: 1; min-width: 0; border: 1px solid #ccc; border-radius: 4px; padding: 6px 8px; font-size: 12px; }
-      button { border: 1px solid #ccc; border-radius: 4px; padding: 2px 6px; font-size: 12px; background: #f8f8f8; }
-      .count { font-size: 12px; color: #333; min-width: 40px; text-align: right; }
+      input {
+        flex: 1;
+        min-width: 0;
+        background: #0b1220;
+        color: #e5e7eb;
+        border: 1px solid #334155;
+        border-radius: 4px;
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+      input::placeholder { color: #94a3b8; }
+      button {
+        border: 1px solid #374151; /* slate-700 */
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-size: 12px;
+        background: #1f2937; /* slate-800 */
+        color: #e5e7eb;
+        cursor: pointer;
+      }
+      button:hover { background: #273449; border-color: #4b5563; }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      .count { font-size: 12px; color: #cbd5e1; min-width: 40px; text-align: right; }
       .spacer { flex: 1; }
-      .settings { display: none; border-top: 1px solid #eee; padding-top: 8px; overflow: hidden; }
+      .settings {
+        display: none;
+        border-top: 1px solid #334155;
+        padding-top: 8px;
+        overflow: hidden;
+      }
       .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-      .settings label { font-size: 12px; color: #333; align-self: center; }
-      .settings input[type="number"], .settings input[type="color"] { border: 1px solid #ccc; border-radius: 4px; padding: 4px 6px; font-size: 12px; }
+      .settings label { font-size: 12px; color: #e5e7eb; align-self: center; }
+      .settings input[type="number"], .settings input[type="color"] {
+        background: #0b1220;
+        color: #e5e7eb;
+        border: 1px solid #334155;
+        border-radius: 4px;
+        padding: 4px 6px;
+        font-size: 12px;
+      }
       .settings-actions { display: flex; justify-content: flex-end; gap: 8px; grid-column: 1 / -1; }
     `;
     root.appendChild(style);
