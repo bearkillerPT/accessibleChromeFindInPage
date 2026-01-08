@@ -24,5 +24,14 @@
   },
   "icons": {
     "128": "128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "dist/popup-app/index.html",
+        "dist/popup-app/assets/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

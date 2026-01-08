@@ -5,7 +5,7 @@
   "main": "dist/background/index.js",
   "scripts": {
     "build:ts": "tsc -p tsconfig.json",
-    "build:popup": "npm --prefix popup-app run build",
+    "build:popup": "npm --prefix popup-app install --no-audit --no-fund && npm --prefix popup-app run build",
     "build:onboarding": "npm --prefix onboarding-app install --no-audit --no-fund && npm --prefix onboarding-app run build",
     "build": "npm run build:ts && npm run build:popup && npm run build:onboarding"
   },

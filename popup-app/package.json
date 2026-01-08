@@ -11,6 +11,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.90.16",
     "accessible_find_in_page": "file:..",
+    "framer-motion": "^11.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

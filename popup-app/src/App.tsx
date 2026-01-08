@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
 
 type Settings = {
@@ -32,6 +33,7 @@ export default function App() {
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
   const [needsShortcut, setNeedsShortcut] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   // No debounce; background/page handle cancellation
 
   const findMutation = useMutation<FindResponse | null, unknown, string>({
@@ -79,9 +81,22 @@ export default function App() {
 
     const onMessage = (e: MessageEvent) => {
       const data = e?.data as { type?: string } | undefined;
-      if (data && data.type === "focusInput") {
+      if (!data) return;
+      if (data.type === "focusInput") {
         inputRef.current?.focus();
         inputRef.current?.select();
+        return;
+      }
+      if (data.type === "requestClose") {
+        // Mirror onClose behavior without relying on page context
+        try {
+          chrome.runtime.sendMessage({ action: "findInPage", searchTerm: "" }, () => {
+            chrome.runtime.sendMessage({ action: "closeOverlay" });
+          });
+        } catch {
+          chrome.runtime.sendMessage({ action: "closeOverlay" });
+        }
+        return;
       }
     };
     window.addEventListener("message", onMessage);
@@ -121,6 +136,24 @@ export default function App() {
       }
     };
   }, []);
+
+  // Report natural size to parent so iframe can autosize
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const sendSize = () => {
+      const width = Math.ceil(el.scrollWidth);
+      const height = Math.ceil(el.scrollHeight);
+      try {
+        window.parent?.postMessage({ type: "accessible-find:size", width, height }, "*");
+      } catch {}
+    };
+    // Initial send + observe for changes
+    sendSize();
+    const ro = new ResizeObserver(() => sendSize());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [rootRef, open, settings, searchTerm, count, currentIndex]);
 
   useEffect(() => {
     // Check whether the keyboard shortcut is assigned; if not, prompt the user
@@ -197,7 +230,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col p-2 gap-2" style={{ maxHeight: 232, overflow: 'auto' }}>
+    <div ref={rootRef} className="flex flex-col p-2 gap-2 bg-slate-900 text-gray-200 overflow-hidden border border-slate-700 rounded-md shadow-lg">
       {needsShortcut && (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs rounded p-2">
           <div className="flex items-center justify-between gap-2">
@@ -249,22 +282,22 @@ export default function App() {
           onChange={(e) => onTermChange(e.target.value)}
           onKeyDown={onInputKeyDown}
           placeholder="Find in Page"
-          className="flex-1 min-w-0 border rounded px-2 py-1 text-sm"
+          className="flex-1 min-w-0 border border-slate-700 rounded px-2 py-1 text-sm bg-slate-800 text-gray-200 placeholder:text-slate-400"
         />
         <div className="flex items-center gap-1">
           {findMutation.isPending ? (
-            <span className="text-xs text-gray-600 min-w-12 text-right inline-flex items-center justify-end">
+            <span className="text-xs text-slate-400 min-w-12 text-right inline-flex items-center justify-end">
               <span className="inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
             </span>
           ) : (
-            <span className="text-xs text-gray-700 min-w-12 text-right">
+            <span className="text-xs text-gray-300 min-w-12 text-right">
               {currentIndex !== null && count > 0
                 ? `${currentIndex + 1}/${count}`
                 : `${count}/${count}`}
             </span>
           )}
           <button
-            className="border rounded px-1 text-xs"
+            className="border border-slate-700 rounded px-1 text-xs bg-slate-800 hover:bg-slate-700"
             title="Previous"
             onClick={onPrev}
             disabled={count === 0 || findMutation.isPending}
@@ -272,7 +305,7 @@ export default function App() {
             ▲
           </button>
           <button
-            className="border rounded px-1 text-xs"
+            className="border border-slate-700 rounded px-1 text-xs bg-slate-800 hover:bg-slate-700"
             title="Next"
             onClick={onNext}
             disabled={count === 0 || findMutation.isPending}
@@ -280,7 +313,7 @@ export default function App() {
             ▼
           </button>
           <button
-            className="border rounded px-2 text-sm ml-1"
+            className="border border-slate-700 rounded px-2 text-sm ml-1 bg-slate-800 hover:bg-slate-700"
             title="Close"
             onClick={onClose}
           >
@@ -289,13 +322,23 @@ export default function App() {
         </div>
       </div>
 
-      {open && settings && (
-        <div className="border rounded p-2 grid grid-cols-2 gap-2">
-          <label className="text-sm col-span-2 font-semibold">Blinking</label>
+      <AnimatePresence initial={false}>
+        {settings && (
+          <motion.div
+            key="settings"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: open ? "auto" : 0, opacity: open ? 1 : 0 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.2, 0.65, 0.3, 0.9] }}
+            style={{ overflow: "hidden" }}
+            className="border border-slate-700 rounded bg-slate-800"
+          >
+            <div className="p-2 grid grid-cols-2 gap-2">
+              <label className="text-sm col-span-2 font-semibold">Blinking</label>
           <label className="text-xs">Interval (ms)</label>
           <input
             type="number"
-            className="border rounded px-2 py-1 text-sm"
+            className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200"
             min={100}
             step={50}
             value={settings.blinkInterval}
@@ -309,7 +352,7 @@ export default function App() {
           <label className="text-xs"># Blinks</label>
           <input
             type="number"
-            className="border rounded px-2 py-1 text-sm"
+            className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200"
             min={1}
             value={settings.numBlinks}
             onChange={(e) =>
@@ -319,7 +362,7 @@ export default function App() {
           <label className="text-xs">Surrounding words</label>
           <input
             type="number"
-            className="border rounded px-2 py-1 text-sm"
+            className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200"
             min={0}
             value={settings.numSurroundingWords}
             onChange={(e) =>
@@ -336,7 +379,7 @@ export default function App() {
           <label className="text-xs">Highlight background</label>
           <input
             type="color"
-            className="border rounded px-2 py-1"
+            className="border border-slate-700 rounded px-2 py-1 bg-slate-900"
             value={settings.highlightBgColor}
             onChange={(e) =>
               setSettings({ ...settings!, highlightBgColor: e.target.value })
@@ -345,7 +388,7 @@ export default function App() {
           <label className="text-xs">Highlight text</label>
           <input
             type="color"
-            className="border rounded px-2 py-1"
+            className="border border-slate-700 rounded px-2 py-1 bg-slate-900"
             value={settings.highlightTextColor}
             onChange={(e) =>
               setSettings({ ...settings!, highlightTextColor: e.target.value })
@@ -354,7 +397,7 @@ export default function App() {
           <label className="text-xs">Border color</label>
           <input
             type="color"
-            className="border rounded px-2 py-1"
+            className="border border-slate-700 rounded px-2 py-1 bg-slate-900"
             value={settings.outlineColor}
             onChange={(e) =>
               setSettings({ ...settings!, outlineColor: e.target.value })
@@ -363,7 +406,7 @@ export default function App() {
           <label className="text-xs">Border width (px)</label>
           <input
             type="number"
-            className="border rounded px-2 py-1 text-sm"
+            className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200"
             min={1}
             value={settings.outlineWidth}
             onChange={(e) =>
@@ -377,7 +420,7 @@ export default function App() {
           <label className="text-xs">Match font size (px)</label>
           <input
             type="number"
-            className="border rounded px-2 py-1 text-sm"
+            className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200"
             min={8}
             value={settings.matchFontSize}
             onChange={(e) =>
@@ -388,23 +431,25 @@ export default function App() {
             }
           />
 
-          <div className="col-span-2 flex justify-end gap-2 mt-2">
+              <div className="col-span-2 flex justify-end gap-2 mt-2">
             <button
-              className="border rounded px-3 py-1 text-sm"
+              className="border border-slate-700 rounded px-3 py-1 text-sm bg-slate-900 hover:bg-slate-800"
               onClick={() => setOpen(false)}
             >
               Close
             </button>
             <button
-              className="bg-blue-600 text-white rounded px-3 py-1 text-sm disabled:opacity-50"
+              className="bg-blue-600 text-white rounded px-3 py-1 text-sm disabled:opacity-50 hover:bg-blue-700"
               onClick={saveSettings}
               disabled={!canSave}
             >
               Save
             </button>
-          </div>
-        </div>
-      )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
