@@ -259,6 +259,9 @@ export async function performSearch(
     outlineColor,
     outlineWidth,
     matchFontSize,
+    blinkInterval,
+    numBlinks,
+    numSurroundingWords,
   };
   setMatches([]);
   setCurrentIndex(null);
@@ -342,6 +345,17 @@ export function cancelSearchAndCleanup(): void {
   removeBlinkingStyles();
   (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).__accessibleFindMatches = [];
   (window as unknown as { __accessibleFindCurrentIndex?: number | null }).__accessibleFindCurrentIndex = null;
+  // Clear any selected-only blink interval
+  try {
+    const sel = (window as unknown as { __afSelectedBlinkId?: number | null }).__afSelectedBlinkId ?? null;
+    if (typeof sel === 'number') {
+      window.clearInterval(sel);
+      (window as unknown as { __afSelectedBlinkId?: number | null }).__afSelectedBlinkId = null;
+    }
+    // Reset any tracked group and token
+    (window as unknown as { __afSelectedBlinkGroup?: { on: HTMLElement[]; off: HTMLElement[] } | null }).__afSelectedBlinkGroup = null;
+    (window as unknown as { __afSelectedBlinkToken?: number | null }).__afSelectedBlinkToken = null;
+  } catch {}
 }
 
 export function navigateMatches(direction: "next" | "prev"): { count: number; currentIndex: number | null } {
@@ -353,12 +367,92 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
     highlightTextColor: string;
     outlineColor: string;
     outlineWidth: number;
+    blinkInterval?: number;
+    numBlinks?: number;
+    numSurroundingWords?: number;
   } }).__accessibleFindStyles ?? {
     highlightBgColor: '#ffff00',
     highlightTextColor: '#000000',
     outlineColor: '#ff8c00',
     outlineWidth: 3,
+    blinkInterval: 400,
+    numBlinks: 2,
+    numSurroundingWords: 1,
   };
+  // Inline helper so it survives chrome.scripting serialization
+  function blinkSelectedInline(node: HTMLElement, st: { highlightBgColor: string; highlightTextColor: string; blinkInterval?: number; numBlinks?: number; numSurroundingWords?: number; }): void {
+    const maxSur = Math.max(0, Number(st.numSurroundingWords ?? 1));
+    const collectSurrounding = (n: HTMLElement, dir: 'left' | 'right'): HTMLElement[] => {
+      const out: HTMLElement[] = [];
+      let cur: ChildNode | null = n;
+      let count = 0;
+      while (cur && count < maxSur) {
+        cur = dir === 'left' ? cur.previousSibling : cur.nextSibling;
+        if (!cur) break;
+        if (cur.nodeType === Node.TEXT_NODE) continue;
+        const el2 = cur as HTMLElement;
+        if (el2.classList && el2.classList.contains('blink-off')) {
+          out.push(el2);
+          count++;
+        } else {
+          break;
+        }
+      }
+      return out;
+    };
+    const left = collectSurrounding(node, 'left').reverse();
+    const right = collectSurrounding(node, 'right');
+    const groupBlink: HTMLElement[] = [node];
+    const groupOff: HTMLElement[] = [...left, ...right];
+    const apply = (elements: HTMLElement[], highlighted: boolean) => {
+      elements.forEach((e) => {
+        if (highlighted) {
+          e.style.backgroundColor = st.highlightBgColor;
+          e.style.color = st.highlightTextColor;
+        } else {
+          e.style.removeProperty('background-color');
+          e.style.removeProperty('color');
+        }
+      });
+    };
+    const getSelBlinkId = (): number | null => (window as unknown as { __afSelectedBlinkId?: number | null }).__afSelectedBlinkId ?? null;
+    const setSelBlinkId = (v: number | null) => { (window as unknown as { __afSelectedBlinkId?: number | null }).__afSelectedBlinkId = v; };
+    const getSelBlinkGroup = (): { on: HTMLElement[]; off: HTMLElement[] } | null => (window as unknown as { __afSelectedBlinkGroup?: { on: HTMLElement[]; off: HTMLElement[] } | null }).__afSelectedBlinkGroup ?? null;
+    const setSelBlinkGroup = (g: { on: HTMLElement[]; off: HTMLElement[] } | null) => { (window as unknown as { __afSelectedBlinkGroup?: { on: HTMLElement[]; off: HTMLElement[] } | null }).__afSelectedBlinkGroup = g; };
+    const getSelBlinkToken = (): number | null => (window as unknown as { __afSelectedBlinkToken?: number | null }).__afSelectedBlinkToken ?? null;
+    const setSelBlinkToken = (t: number | null) => { (window as unknown as { __afSelectedBlinkToken?: number | null }).__afSelectedBlinkToken = t; };
+
+    // Reset any previous group's visual state before switching
+    try {
+      const prevGroup = getSelBlinkGroup();
+      if (prevGroup) {
+        apply(prevGroup.on, true);
+        apply(prevGroup.off, false);
+      }
+    } catch {}
+    const prevId = getSelBlinkId();
+    if (typeof prevId === 'number') { window.clearInterval(prevId); setSelBlinkId(null); }
+    // New token to invalidate any stray ticks from previous intervals
+    const token = Math.floor(Date.now() ^ Math.random() * 1e9);
+    setSelBlinkToken(token);
+    let remaining = Math.max(1, Number(st.numBlinks ?? 2)) * 2;
+    const interval = Math.max(50, Number(st.blinkInterval ?? 400));
+    // Ensure initial state matches default: ON for blink, OFF for blink-off
+    apply(groupBlink, true);
+    apply(groupOff, false);
+    // Publish the current group so a future navigation can reset it
+    setSelBlinkGroup({ on: groupBlink, off: groupOff });
+    const id = window.setInterval(() => {
+      // Invalidate ticks from a previous selection quickly
+      if (getSelBlinkToken() !== token) { window.clearInterval(id); return; }
+      if (remaining <= 0) { window.clearInterval(id); setSelBlinkId(null); apply(groupBlink, true); apply(groupOff, false); return; }
+      const on = remaining % 2 === 1;
+      apply(groupBlink, on);
+      apply(groupOff, !on);
+      remaining--;
+    }, interval);
+    setSelBlinkId(id);
+  }
   const setCurrentIndex = (idx: number | null): void => {
     (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
       __accessibleFindCurrentIndex = idx;
@@ -389,6 +483,9 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
   if (el) {
     el.style.outline = `${styles.outlineWidth}px solid ${styles.outlineColor}`;
     el.scrollIntoView({ block: "center", inline: "nearest" });
+    // Blink only the selected match (and its surrounding words) using the standard timings/colors
+    try { blinkSelectedInline(el, styles); } catch {}
   }
   return { count, currentIndex: idx };
 }
+
