@@ -7,8 +7,11 @@ declare global {
       highlightBgColor: string;
       highlightTextColor: string;
       outlineColor: string;
-      outlineWidth: number;
+      borderWidth: number;
       matchFontSize: number;
+      selectedBgColor?: string;
+      selectedBorderColor?: string;
+      selectedTextColor?: string;
     };
   }
 }

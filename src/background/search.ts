@@ -6,7 +6,7 @@ export function blinkLinesWithSearchTerm(
   tabId: number,
   settings: Settings
 ): Promise<{ blinkIntervalId: number | null; count: number; currentIndex: number | null }> {
-  const { blinkInterval, numBlinks, numSurroundingWords, highlightBgColor, highlightTextColor, outlineColor, outlineWidth, matchFontSize } = settings;
+  const { blinkInterval, numBlinks, numSurroundingWords, highlightBgColor, highlightTextColor, outlineColor, borderWidth, matchFontSize, selectedBgColor, selectedBorderColor, selectedTextColor } = settings;
   return new Promise((resolve) => {
     // First cancel any ongoing search and remove existing spans immediately
     chrome.scripting.executeScript(
@@ -21,7 +21,7 @@ export function blinkLinesWithSearchTerm(
           {
             target: { tabId },
             func: performSearch,
-            args: [searchTerm, blinkInterval, numBlinks, numSurroundingWords, highlightBgColor, highlightTextColor, outlineColor, outlineWidth, matchFontSize],
+            args: [searchTerm, blinkInterval, numBlinks, numSurroundingWords, highlightBgColor, highlightTextColor, outlineColor, borderWidth, matchFontSize, selectedBgColor, selectedBorderColor, selectedTextColor],
           },
           (results) => {
             const first = results && results[0] ? results[0] : undefined;

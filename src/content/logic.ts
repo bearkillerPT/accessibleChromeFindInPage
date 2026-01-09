@@ -6,8 +6,11 @@ export async function performSearch(
   highlightBgColor: string,
   highlightTextColor: string,
   outlineColor: string,
-  outlineWidth: number,
-  matchFontSize: number
+  borderWidth: number,
+  matchFontSize: number,
+  selectedBgColor: string,
+  selectedBorderColor: string,
+  selectedTextColor: string
 ): Promise<{ blinkIntervalId: number | null; count: number; currentIndex: number | null }> {
   // Cancellation token management
   const getActiveToken = (): number | null =>
@@ -115,6 +118,9 @@ export async function performSearch(
     (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).
       __accessibleFindMatches = m;
   };
+  const getCurrentIndex = (): number | null =>
+    (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
+      __accessibleFindCurrentIndex ?? null;
   
   const setCurrentIndex = (idx: number | null): void => {
     (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
@@ -127,9 +133,21 @@ export async function performSearch(
   ): void => {
     elements.forEach((element) => {
       const el = element as HTMLElement;
+      const styles = (window as unknown as { __accessibleFindStyles?: {
+        highlightBgColor: string; highlightTextColor: string; selectedBgColor?: string; selectedTextColor?: string;
+      } }).__accessibleFindStyles ?? { highlightBgColor, highlightTextColor };
+      // If this element is the currently selected match, prefer selected colors when highlighting
+      const matches = (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).__accessibleFindMatches ?? [];
+      const curIdx = getCurrentIndex();
+      const selectedEl = typeof curIdx === 'number' ? matches[curIdx] : undefined;
       if (highlighted) {
-        el.style.backgroundColor = highlightBgColor;
-        el.style.color = highlightTextColor;
+        if (selectedEl && el === selectedEl) {
+          el.style.backgroundColor = styles.selectedBgColor ?? styles.highlightBgColor;
+          el.style.color = styles.selectedTextColor ?? styles.highlightTextColor;
+        } else {
+          el.style.backgroundColor = styles.highlightBgColor;
+          el.style.color = styles.highlightTextColor;
+        }
       } else {
         el.style.removeProperty("background-color");
         el.style.removeProperty("color");
@@ -143,11 +161,34 @@ export async function performSearch(
     matches.forEach((m) => {
       m.style.removeProperty("outline");
       m.style.removeProperty("border");
+      m.style.removeProperty("outline-offset");
+      m.style.removeProperty("margin-left");
+      m.style.removeProperty("margin-right");
+      m.style.removeProperty("display");
+      // Reset background/text to default highlight in case previous selection changed it
+      try {
+        const st = (window as unknown as { __accessibleFindStyles?: {
+          highlightBgColor: string; highlightTextColor: string;
+        } }).__accessibleFindStyles;
+        if (st) { m.style.backgroundColor = st.highlightBgColor; m.style.color = st.highlightTextColor; }
+      } catch {}
     });
     if (index === null) return;
     const el = matches[index];
     if (!el) return;
-    el.style.outline = `${outlineWidth}px solid ${outlineColor}`;
+    const st = (window as unknown as { __accessibleFindStyles?: {
+      borderWidth: number; outlineColor: string; selectedBorderColor?: string; selectedBgColor?: string; selectedTextColor?: string; highlightTextColor: string;
+    } }).__accessibleFindStyles ?? { borderWidth, outlineColor, selectedBorderColor, selectedBgColor, selectedTextColor, highlightTextColor };
+    el.style.outline = `${st.borderWidth}px solid ${st.selectedBorderColor ?? st.outlineColor}`;
+    // Add small margins so the outline doesn't overlap adjacent glyphs
+    el.style.display = 'inline-block';
+    el.style.marginLeft = `${st.borderWidth}px`;
+    el.style.marginRight = `${st.borderWidth}px`;
+    // Selected background override
+    if (st.selectedBgColor) {
+      el.style.backgroundColor = st.selectedBgColor;
+      el.style.color = st.selectedTextColor ?? st.highlightTextColor;
+    }
     el.scrollIntoView({ block: "center", inline: "nearest" });
   };
 
@@ -190,9 +231,11 @@ export async function performSearch(
       const parentEl = node.parentElement;
       if (!parentEl || shouldSkipElement(parentEl)) return;
       const raw = node.textContent ?? "";
-      const text = raw.trim();
-      if (!text) return;
-      const contentStrings = text.split(" ");
+      // Skip processing if the node contains only whitespace
+      if (!raw.trim()) return;
+      // Split into tokens while preserving original whitespace delimiters
+      const parts = raw.split(/(\s+)/);
+      const isWhitespace = (s: string): boolean => /^\s+$/.test(s);
       let changed = false;
       const shouldWrapOff = (token: string): boolean => {
         return (
@@ -202,28 +245,43 @@ export async function performSearch(
           !!token.match(regex) === false
         );
       };
-      for (let i = 0; i < contentStrings.length; i++) {
-        const token = contentStrings[i];
+      for (let i = 0; i < parts.length; i++) {
+        const token = parts[i];
+        if (!token || isWhitespace(token)) continue;
         if (token.includes('<span class="blink')) continue;
         if (token.match(regex)) {
-          contentStrings[i] = token.replace(regex, '<span class="blink">$&</span>');
+          // Wrap only the matched substring within the token
+          parts[i] = token.replace(regex, '<span class="blink">$&</span>');
           changed = true;
           for (let j = 1; j <= numSurroundingWords; j++) {
-            const left = i - j;
-            const right = i + j;
-            if (left >= 0 && shouldWrapOff(contentStrings[left])) {
-              contentStrings[left] = `<span class="blink-off">${contentStrings[left]}</span>`;
+            // Find the j-th non-whitespace token to the left
+            let left = i;
+            let stepsLeft = j;
+            while (left > 0 && stepsLeft > 0) {
+              left--;
+              if (!isWhitespace(parts[left])) stepsLeft--;
+            }
+            // Find the j-th non-whitespace token to the right
+            let right = i;
+            let stepsRight = j;
+            while (right < parts.length - 1 && stepsRight > 0) {
+              right++;
+              if (!isWhitespace(parts[right])) stepsRight--;
+            }
+            if (left >= 0 && !isWhitespace(parts[left]) && shouldWrapOff(parts[left])) {
+              parts[left] = `<span class="blink-off">${parts[left]}</span>`;
               changed = true;
             }
-            if (right < contentStrings.length && shouldWrapOff(contentStrings[right])) {
-              contentStrings[right] = `<span class="blink-off">${contentStrings[right]}</span>`;
+            if (right < parts.length && !isWhitespace(parts[right]) && shouldWrapOff(parts[right])) {
+              parts[right] = `<span class="blink-off">${parts[right]}</span>`;
               changed = true;
             }
           }
         }
       }
       if (!changed) return;
-      const spanHTML = contentStrings.join(" ");
+      // Reassemble with original whitespace preserved
+      const spanHTML = parts.join("");
       const parent = node.parentNode as HTMLElement | null;
       if (!parent) return;
       ops.push({ parent, node, html: spanHTML });
@@ -257,11 +315,14 @@ export async function performSearch(
     highlightBgColor,
     highlightTextColor,
     outlineColor,
-    outlineWidth,
+    borderWidth,
     matchFontSize,
     blinkInterval,
     numBlinks,
     numSurroundingWords,
+    selectedBgColor,
+    selectedBorderColor,
+    selectedTextColor,
   };
   setMatches([]);
   setCurrentIndex(null);
@@ -366,21 +427,24 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
     highlightBgColor: string;
     highlightTextColor: string;
     outlineColor: string;
-    outlineWidth: number;
+    borderWidth: number;
     blinkInterval?: number;
     numBlinks?: number;
     numSurroundingWords?: number;
+    selectedBgColor?: string;
+    selectedBorderColor?: string;
+    selectedTextColor?: string;
   } }).__accessibleFindStyles ?? {
     highlightBgColor: '#ffff00',
     highlightTextColor: '#000000',
     outlineColor: '#ff8c00',
-    outlineWidth: 3,
+    borderWidth: 3,
     blinkInterval: 400,
     numBlinks: 2,
     numSurroundingWords: 1,
   };
   // Inline helper so it survives chrome.scripting serialization
-  function blinkSelectedInline(node: HTMLElement, st: { highlightBgColor: string; highlightTextColor: string; blinkInterval?: number; numBlinks?: number; numSurroundingWords?: number; }): void {
+  function blinkSelectedInline(node: HTMLElement, st: { highlightBgColor: string; selectedBgColor?: string; selectedTextColor?: string; highlightTextColor: string; blinkInterval?: number; numBlinks?: number; numSurroundingWords?: number; }): void {
     const maxSur = Math.max(0, Number(st.numSurroundingWords ?? 1));
     const collectSurrounding = (n: HTMLElement, dir: 'left' | 'right'): HTMLElement[] => {
       const out: HTMLElement[] = [];
@@ -404,7 +468,18 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
     const right = collectSurrounding(node, 'right');
     const groupBlink: HTMLElement[] = [node];
     const groupOff: HTMLElement[] = [...left, ...right];
-    const apply = (elements: HTMLElement[], highlighted: boolean) => {
+    const applySelected = (elements: HTMLElement[], highlighted: boolean) => {
+      elements.forEach((e) => {
+        if (highlighted) {
+          e.style.backgroundColor = st.selectedBgColor ?? st.highlightBgColor;
+          e.style.color = st.selectedTextColor ?? st.highlightTextColor;
+        } else {
+          e.style.removeProperty('background-color');
+          e.style.removeProperty('color');
+        }
+      });
+    };
+    const applyOff = (elements: HTMLElement[], highlighted: boolean) => {
       elements.forEach((e) => {
         if (highlighted) {
           e.style.backgroundColor = st.highlightBgColor;
@@ -422,12 +497,13 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
     const getSelBlinkToken = (): number | null => (window as unknown as { __afSelectedBlinkToken?: number | null }).__afSelectedBlinkToken ?? null;
     const setSelBlinkToken = (t: number | null) => { (window as unknown as { __afSelectedBlinkToken?: number | null }).__afSelectedBlinkToken = t; };
 
-    // Reset any previous group's visual state before switching
+    // Reset previous group's visual state before switching:
+    // revert previously selected element to normal highlight, and remove off-highlights
     try {
       const prevGroup = getSelBlinkGroup();
       if (prevGroup) {
-        apply(prevGroup.on, true);
-        apply(prevGroup.off, false);
+        applyOff(prevGroup.on, true);
+        applyOff(prevGroup.off, false);
       }
     } catch {}
     const prevId = getSelBlinkId();
@@ -438,17 +514,17 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
     let remaining = Math.max(1, Number(st.numBlinks ?? 2)) * 2;
     const interval = Math.max(50, Number(st.blinkInterval ?? 400));
     // Ensure initial state matches default: ON for blink, OFF for blink-off
-    apply(groupBlink, true);
-    apply(groupOff, false);
+    applySelected(groupBlink, true);
+    applyOff(groupOff, false);
     // Publish the current group so a future navigation can reset it
     setSelBlinkGroup({ on: groupBlink, off: groupOff });
     const id = window.setInterval(() => {
       // Invalidate ticks from a previous selection quickly
       if (getSelBlinkToken() !== token) { window.clearInterval(id); return; }
-      if (remaining <= 0) { window.clearInterval(id); setSelBlinkId(null); apply(groupBlink, true); apply(groupOff, false); return; }
+      if (remaining <= 0) { window.clearInterval(id); setSelBlinkId(null); applySelected(groupBlink, true); applyOff(groupOff, false); return; }
       const on = remaining % 2 === 1;
-      apply(groupBlink, on);
-      apply(groupOff, !on);
+      applySelected(groupBlink, on);
+      applyOff(groupOff, !on);
       remaining--;
     }, interval);
     setSelBlinkId(id);
@@ -478,10 +554,29 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
   matches.forEach((m) => {
     m.style.removeProperty("outline");
     m.style.removeProperty("border");
+    m.style.removeProperty("outline-offset");
+    m.style.removeProperty("margin-left");
+    m.style.removeProperty("margin-right");
+    m.style.removeProperty("display");
+    // Ensure any previously selected match reverts to normal highlight colors
+    try {
+      const st = (window as unknown as { __accessibleFindStyles?: {
+        highlightBgColor: string; highlightTextColor: string;
+      } }).__accessibleFindStyles;
+      if (st) { m.style.backgroundColor = st.highlightBgColor; m.style.color = st.highlightTextColor; }
+    } catch {}
   });
   const el = matches[idx];
   if (el) {
-    el.style.outline = `${styles.outlineWidth}px solid ${styles.outlineColor}`;
+    const selectedBorderColor = (styles as any).selectedBorderColor ?? styles.outlineColor;
+    el.style.outline = `${styles.borderWidth}px solid ${selectedBorderColor}`;
+    el.style.display = 'inline-block';
+    el.style.marginLeft = `${styles.borderWidth}px`;
+    el.style.marginRight = `${styles.borderWidth}px`;
+    const selectedBgColor = (styles as any).selectedBgColor ?? styles.highlightBgColor;
+    const selectedTextColor = (styles as any).selectedTextColor ?? styles.highlightTextColor;
+    el.style.backgroundColor = selectedBgColor;
+    el.style.color = selectedTextColor;
     el.scrollIntoView({ block: "center", inline: "nearest" });
     // Blink only the selected match (and its surrounding words) using the standard timings/colors
     try { blinkSelectedInline(el, styles); } catch {}

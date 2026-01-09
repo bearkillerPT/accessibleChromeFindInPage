@@ -5,8 +5,11 @@ export interface Settings {
   highlightBgColor: string;
   highlightTextColor: string;
   outlineColor: string;
-  outlineWidth: number; // in px
+  borderWidth: number; // in px
   matchFontSize: number; // in px
+  selectedBgColor: string;
+  selectedBorderColor: string;
+  selectedTextColor: string;
 }
 
 export const defaultSettings: Settings = {
@@ -14,10 +17,13 @@ export const defaultSettings: Settings = {
   numBlinks: 2,
   numSurroundingWords: 1,
   highlightBgColor: "#ffff00",
-  highlightTextColor: "#000000",
+  highlightTextColor: "#000",
   outlineColor: "#ff8c00",
-  outlineWidth: 3,
+  borderWidth: 3,
   matchFontSize: 20,
+  selectedBgColor: "#ff8c00",
+  selectedBorderColor: "#ffff00",
+  selectedTextColor: "#fff",
 };
 
 export function getSettings(): Promise<Settings> {

@@ -25,7 +25,8 @@ type RuntimeMessage =
   | { action: 'setSettings'; settings: Settings }
   | { action: 'findInPage'; searchTerm: string }
   | { action: 'navigateMatch'; direction: 'next' | 'prev' }
-  | { action: 'openShortcuts' };
+  | { action: 'openShortcuts' }
+  | { action: 'resetSettings' };
 
 chrome.runtime.onMessage.addListener(
   (message: RuntimeMessage, _sender, sendResponse): boolean | void => {
@@ -40,6 +41,14 @@ chrome.runtime.onMessage.addListener(
       setSettings(updated).then(() => {
         settings = { ...settings, ...updated };
         sendResponse({ ok: true });
+      });
+      return true; // async response
+    }
+
+    if (action === 'resetSettings') {
+      setSettings(defaultSettings).then(() => {
+        settings = { ...defaultSettings };
+        sendResponse({ ok: true, settings });
       });
       return true; // async response
     }

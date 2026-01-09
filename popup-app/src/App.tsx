@@ -9,8 +9,11 @@ type Settings = {
   highlightBgColor: string;
   highlightTextColor: string;
   outlineColor: string;
-  outlineWidth: number;
+  borderWidth: number;
   matchFontSize: number;
+  selectedBgColor: string;
+  selectedBorderColor: string;
+  selectedTextColor: string;
 };
 
 type FindResponse = {
@@ -408,11 +411,11 @@ export default function App() {
             type="number"
             className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200"
             min={1}
-            value={settings.outlineWidth}
+            value={settings.borderWidth}
             onChange={(e) =>
               setSettings({
                 ...settings!,
-                outlineWidth: Number(e.target.value),
+                borderWidth: Number(e.target.value),
               })
             }
           />
@@ -430,6 +433,33 @@ export default function App() {
               })
             }
           />
+          <label className="text-xs">Selected background</label>
+          <input
+            type="color"
+            className="border border-slate-700 rounded px-2 py-1 bg-slate-900"
+            value={settings.selectedBgColor}
+            onChange={(e) =>
+              setSettings({ ...settings!, selectedBgColor: e.target.value })
+            }
+          />
+          <label className="text-xs">Selected text</label>
+          <input
+            type="color"
+            className="border border-slate-700 rounded px-2 py-1 bg-slate-900"
+            value={settings.selectedTextColor}
+            onChange={(e) =>
+              setSettings({ ...settings!, selectedTextColor: e.target.value })
+            }
+          />
+          <label className="text-xs">Selected border color</label>
+          <input
+            type="color"
+            className="border border-slate-700 rounded px-2 py-1 bg-slate-900"
+            value={settings.selectedBorderColor}
+            onChange={(e) =>
+              setSettings({ ...settings!, selectedBorderColor: e.target.value })
+            }
+          />
 
               <div className="col-span-2 flex justify-end gap-2 mt-2">
             <button
@@ -437,6 +467,22 @@ export default function App() {
               onClick={() => setOpen(false)}
             >
               Close
+            </button>
+            <button
+              className="border border-slate-700 rounded px-3 py-1 text-sm bg-slate-900 hover:bg-slate-800"
+              onClick={() => {
+                chrome.runtime.sendMessage({ action: 'resetSettings' }, (resp: { ok: boolean; settings?: Settings } | null) => {
+                  if (resp && resp.ok && resp.settings) {
+                    setSettings(resp.settings);
+                    // Re-run search if term is active to apply defaults immediately
+                    if (searchTerm && searchTerm.trim().length > 0) {
+                      findMutation.mutate(searchTerm);
+                    }
+                  }
+                });
+              }}
+            >
+              Reset to defaults
             </button>
             <button
               className="bg-blue-600 text-white rounded px-3 py-1 text-sm disabled:opacity-50 hover:bg-blue-700"
