@@ -224,7 +224,10 @@ export async function performSearch(
     searchText: string
   ): Promise<{ ops: Array<{ parent: HTMLElement; node: Node; html: string }> }> => {
     const queue: Node[] = Array.from(root.childNodes);
-    const regex = new RegExp(searchText, "gi");
+    // Treat input as plain text by escaping regex metacharacters
+    const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = escapeRegExp(searchText);
+    const regex = new RegExp(pattern, "gi");
     const ops: Array<{ parent: HTMLElement; node: Node; html: string }> = [];
 
     const processTextNode = (node: Node): void => {
@@ -233,58 +236,105 @@ export async function performSearch(
       const raw = node.textContent ?? "";
       // Skip processing if the node contains only whitespace
       if (!raw.trim()) return;
-      // Split into tokens while preserving original whitespace delimiters
-      const parts = raw.split(/(\s+)/);
-      const isWhitespace = (s: string): boolean => /^\s+$/.test(s);
-      let changed = false;
-      const shouldWrapOff = (token: string): boolean => {
-        return (
-          !!token &&
-          !token.includes('class="blink') &&
-          !token.includes('<span class="blink') &&
-          !!token.match(regex) === false
-        );
+
+      // Find all match ranges within the raw text
+      const matches: Array<{ start: number; end: number }> = [];
+      let m: RegExpExecArray | null;
+      regex.lastIndex = 0;
+      while ((m = regex.exec(raw)) !== null) {
+        matches.push({ start: m.index, end: m.index + m[0].length });
+        // Prevent zero-length infinite loops
+        if (m[0].length === 0) regex.lastIndex++;
+      }
+      if (matches.length === 0) return;
+
+      // Helpers to find word boundaries to the left/right of a position
+      const isWS = (ch: string): boolean => /\s/.test(ch);
+      const findWordLeft = (pos: number): { start: number; end: number } | null => {
+        let i = pos - 1;
+        while (i >= 0 && isWS(raw[i])) i--;
+        if (i < 0) return null;
+        let end = i + 1;
+        while (i >= 0 && !isWS(raw[i])) i--;
+        const start = i + 1;
+        return { start, end };
       };
-      for (let i = 0; i < parts.length; i++) {
-        const token = parts[i];
-        if (!token || isWhitespace(token)) continue;
-        if (token.includes('<span class="blink')) continue;
-        if (token.match(regex)) {
-          // Wrap only the matched substring within the token
-          parts[i] = token.replace(regex, '<span class="blink">$&</span>');
-          changed = true;
-          for (let j = 1; j <= numSurroundingWords; j++) {
-            // Find the j-th non-whitespace token to the left
-            let left = i;
-            let stepsLeft = j;
-            while (left > 0 && stepsLeft > 0) {
-              left--;
-              if (!isWhitespace(parts[left])) stepsLeft--;
-            }
-            // Find the j-th non-whitespace token to the right
-            let right = i;
-            let stepsRight = j;
-            while (right < parts.length - 1 && stepsRight > 0) {
-              right++;
-              if (!isWhitespace(parts[right])) stepsRight--;
-            }
-            if (left >= 0 && !isWhitespace(parts[left]) && shouldWrapOff(parts[left])) {
-              parts[left] = `<span class="blink-off">${parts[left]}</span>`;
-              changed = true;
-            }
-            if (right < parts.length && !isWhitespace(parts[right]) && shouldWrapOff(parts[right])) {
-              parts[right] = `<span class="blink-off">${parts[right]}</span>`;
-              changed = true;
-            }
-          }
+      const findWordRight = (pos: number): { start: number; end: number } | null => {
+        let i = pos;
+        while (i < raw.length && isWS(raw[i])) i++;
+        if (i >= raw.length) return null;
+        const start = i;
+        while (i < raw.length && !isWS(raw[i])) i++;
+        const end = i;
+        return { start, end };
+      };
+
+      // Collect off-highlight ranges around each match
+      const offRanges: Array<{ start: number; end: number }> = [];
+      for (let k = 0; k < matches.length; k++) {
+        const { start, end } = matches[k];
+        // Left-side words
+        let leftPos = start;
+        for (let j = 0; j < numSurroundingWords; j++) {
+          const w = findWordLeft(leftPos);
+          if (!w) break;
+          offRanges.push(w);
+          leftPos = w.start;
+        }
+        // Right-side words
+        let rightPos = end;
+        for (let j = 0; j < numSurroundingWords; j++) {
+          const w = findWordRight(rightPos);
+          if (!w) break;
+          offRanges.push(w);
+          rightPos = w.end;
         }
       }
-      if (!changed) return;
-      // Reassemble with original whitespace preserved
-      const spanHTML = parts.join("");
+
+      // Build final HTML by merging blink and off ranges
+      type Range = { start: number; end: number; kind: "blink" | "off" };
+      const ranges: Range[] = [
+        ...matches.map((r) => ({ ...r, kind: "blink" as const })),
+        ...offRanges.map((r) => ({ ...r, kind: "off" as const })),
+      ].sort((a, b) => a.start - b.start || a.end - b.end);
+
+      // Remove off ranges that overlap any blink range, and deduplicate
+      const blinkRanges = ranges.filter((r) => r.kind === "blink");
+      const isOverlappingBlink = (r: Range): boolean =>
+        blinkRanges.some((b) => !(r.end <= b.start || r.start >= b.end));
+      const norm: Range[] = [];
+      for (let i = 0; i < ranges.length; i++) {
+        const r = ranges[i];
+        if (r.kind === "off" && isOverlappingBlink(r)) continue;
+        // Skip if identical to previous
+        const prev = norm[norm.length - 1];
+        if (prev && prev.start === r.start && prev.end === r.end && prev.kind === r.kind) continue;
+        norm.push(r);
+      }
+
+      // Generate HTML by walking through raw and applying ranges
+      let html = "";
+      let cursor = 0;
+      for (let i = 0; i < norm.length; i++) {
+        const r = norm[i];
+        // Clamp invalid ranges
+        let s = Math.max(cursor, Math.min(raw.length, r.start));
+        const e = Math.max(s, Math.min(raw.length, r.end));
+        if (e <= s) continue;
+        if (cursor < s) html += raw.slice(cursor, s);
+        const inner = raw.slice(s, e);
+        if (r.kind === "blink") {
+          html += `<span class="blink">${inner}</span>`;
+        } else {
+          html += `<span class="blink-off">${inner}</span>`;
+        }
+        cursor = e;
+      }
+      if (cursor < raw.length) html += raw.slice(cursor);
+
       const parent = node.parentNode as HTMLElement | null;
       if (!parent) return;
-      ops.push({ parent, node, html: spanHTML });
+      ops.push({ parent, node, html });
     };
 
     const CHUNK = 600; // nodes per tick; smaller chunk for faster cancellation
@@ -326,7 +376,7 @@ export async function performSearch(
   };
   setMatches([]);
   setCurrentIndex(null);
-  if (!searchTerm) {
+  if (!searchTerm.trim()) {
     return { blinkIntervalId: null, count: 0, currentIndex: null };
   }
   // Run traversal in chunks so cancellation can interrupt promptly
