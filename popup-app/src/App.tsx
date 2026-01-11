@@ -34,6 +34,8 @@ export default function App() {
   const [profiles, setProfiles] = useState<Array<{ id: string; name: string; system?: boolean }>>([]);
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  // Controls enter/exit animation of the popup container
+  const [visible, setVisible] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [count, setCount] = useState(0);
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
@@ -117,14 +119,18 @@ export default function App() {
         return;
       }
       if (data.type === "requestClose") {
-        // Mirror onClose behavior without relying on page context
-        try {
-          chrome.runtime.sendMessage({ action: "findInPage", searchTerm: "" }, () => {
+        // Animate exit then request overlay close
+        setVisible(false);
+        const EXIT_MS = 200;
+        window.setTimeout(() => {
+          try {
+            chrome.runtime.sendMessage({ action: "findInPage", searchTerm: "" }, () => {
+              chrome.runtime.sendMessage({ action: "closeOverlay" });
+            });
+          } catch {
             chrome.runtime.sendMessage({ action: "closeOverlay" });
-          });
-        } catch {
-          chrome.runtime.sendMessage({ action: "closeOverlay" });
-        }
+          }
+        }, EXIT_MS);
         return;
       }
     };
@@ -136,19 +142,23 @@ export default function App() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        // Reset the search in the active tab
-        try {
-          chrome.runtime.sendMessage(
-            { action: "findInPage", searchTerm: "" },
-            () => {
-              setSearchTerm("");
-              chrome.runtime.sendMessage({ action: "closeOverlay" });
-            }
-          );
-        } catch {
-          setSearchTerm("");
-          chrome.runtime.sendMessage({ action: "closeOverlay" });
-        }
+        // Animate exit, then reset search and close overlay
+        setVisible(false);
+        const EXIT_MS = 200;
+        window.setTimeout(() => {
+          try {
+            chrome.runtime.sendMessage(
+              { action: "findInPage", searchTerm: "" },
+              () => {
+                setSearchTerm("");
+                chrome.runtime.sendMessage({ action: "closeOverlay" });
+              }
+            );
+          } catch {
+            setSearchTerm("");
+            chrome.runtime.sendMessage({ action: "closeOverlay" });
+          }
+        }, EXIT_MS);
       }
     };
     document.addEventListener("keydown", onKeyDown);
@@ -256,15 +266,20 @@ export default function App() {
   }
 
   function onClose() {
-    try {
-      chrome.runtime.sendMessage({ action: "findInPage", searchTerm: "" }, () => {
+    // Trigger exit animation first, then close overlay
+    setVisible(false);
+    const EXIT_MS = 200;
+    window.setTimeout(() => {
+      try {
+        chrome.runtime.sendMessage({ action: "findInPage", searchTerm: "" }, () => {
+          setSearchTerm("");
+          chrome.runtime.sendMessage({ action: "closeOverlay" });
+        });
+      } catch {
         setSearchTerm("");
         chrome.runtime.sendMessage({ action: "closeOverlay" });
-      });
-    } catch {
-      setSearchTerm("");
-      chrome.runtime.sendMessage({ action: "closeOverlay" });
-    }
+      }
+    }, EXIT_MS);
   }
 
   function onInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -275,10 +290,17 @@ export default function App() {
   }
 
   return (
-    <div
-      ref={rootRef}
-      className="flex flex-col p-2 gap-2 bg-slate-900 text-gray-200 overflow-hidden border border-slate-700 rounded-md shadow-lg"
-    >
+    <AnimatePresence initial={true}>
+      {visible && (
+        <motion.div
+          key="popup-root"
+          ref={rootRef as any}
+          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -6, scale: 0.98 }}
+          transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+          className="flex flex-col p-2 gap-2 bg-slate-900 text-gray-200 overflow-hidden border border-slate-700 rounded-md shadow-lg"
+        >
       {needsShortcut && (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs rounded p-2">
           <div className="flex items-center justify-between gap-2">
@@ -453,6 +475,8 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

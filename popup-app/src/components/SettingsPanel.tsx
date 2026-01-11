@@ -31,13 +31,27 @@ type SettingsPanelProps = {
   activeIsSystem?: boolean;
 };
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <fieldset className="border border-slate-700 rounded p-2 h-full" aria-labelledby={`${title}-legend`}>
-      <legend id={`${title}-legend`} className="px-1 text-sm font-semibold text-gray-200">
+    <fieldset
+      className="border border-slate-700 rounded p-2 h-full"
+      aria-labelledby={`${title}-legend`}
+    >
+      <legend
+        id={`${title}-legend`}
+        className="px-1 text-sm font-semibold text-gray-200"
+      >
         {title}
       </legend>
-      <div className="grid grid-cols-[max-content,1fr] gap-x-2 gap-y-2 items-center">{children}</div>
+      <div className="grid grid-cols-[max-content,1fr] gap-x-2 gap-y-2 items-center">
+        {children}
+      </div>
     </fieldset>
   );
 }
@@ -107,14 +121,27 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const m = hex.trim().match(/^#([\da-f]{3}|[\da-f]{6})$/i);
   if (!m) return null;
   let h = m[1];
-  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  if (h.length === 3)
+    h = h
+      .split("")
+      .map((c) => c + c)
+      .join("");
   const num = parseInt(h, 16);
   return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
 }
 
-function relLuminance({ r, g, b }: { r: number; g: number; b: number }): number {
+function relLuminance({
+  r,
+  g,
+  b,
+}: {
+  r: number;
+  g: number;
+  b: number;
+}): number {
   const srgb = [r, g, b].map((c) => c / 255);
-  const f = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const f = (c: number) =>
+    c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
   const [R, G, B] = srgb.map(f);
   return 0.2126 * R + 0.7152 * G + 0.0722 * B;
 }
@@ -130,7 +157,20 @@ function contrastRatio(bgHex: string, fgHex: string): number | null {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, profiles, activeProfileId, onSelectProfile, onCreateProfile, onRenameProfile, onDeleteProfile, activeIsSystem }: SettingsPanelProps) {
+export function SettingsPanel({
+  settings,
+  onChange,
+  onClose,
+  onReset,
+  onSave,
+  profiles,
+  activeProfileId,
+  onSelectProfile,
+  onCreateProfile,
+  onRenameProfile,
+  onDeleteProfile,
+  activeIsSystem,
+}: SettingsPanelProps) {
   // Shortcut status
   const [shortcut, setShortcut] = useState<string | null>(null);
   const [checking, setChecking] = useState<boolean>(true);
@@ -156,12 +196,17 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
           return;
         }
         // @ts-ignore
-        chrome.commands.getAll((cmds: Array<{ name: string; shortcut?: string }>) => {
-          const cmd = (cmds || []).find((c) => c.name === "open_popup");
-          const sc = cmd && cmd.shortcut && cmd.shortcut.trim().length > 0 ? cmd.shortcut : null;
-          setShortcut(sc);
-          setChecking(sc == null);
-        });
+        chrome.commands.getAll(
+          (cmds: Array<{ name: string; shortcut?: string }>) => {
+            const cmd = (cmds || []).find((c) => c.name === "open_popup");
+            const sc =
+              cmd && cmd.shortcut && cmd.shortcut.trim().length > 0
+                ? cmd.shortcut
+                : null;
+            setShortcut(sc);
+            setChecking(sc == null);
+          }
+        );
       } catch {
         setChecking(false);
         setShortcut(null);
@@ -188,16 +233,25 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
     } catch {}
     // Fallback via background
     // @ts-ignore
-    chrome.runtime.sendMessage({ action: "openShortcuts" }, (res: { ok: boolean } | null) => {
-      if (res && res.ok) return;
-      alert(
-        `Please open ${url} and set a shortcut for "Open Accessible Find In Page popup" (not "Activate the extension").`
-      );
-    });
+    chrome.runtime.sendMessage(
+      { action: "openShortcuts" },
+      (res: { ok: boolean } | null) => {
+        if (res && res.ok) return;
+        alert(
+          `Please open ${url} and set a shortcut for "Open Accessible Find In Page popup" (not "Activate the extension").`
+        );
+      }
+    );
   }
 
-  const ratioHighlight = contrastRatio(settings.highlightBgColor, settings.highlightTextColor);
-  const ratioSelected = contrastRatio(settings.selectedBgColor, settings.selectedTextColor);
+  const ratioHighlight = contrastRatio(
+    settings.highlightBgColor,
+    settings.highlightTextColor
+  );
+  const ratioSelected = contrastRatio(
+    settings.selectedBgColor,
+    settings.selectedTextColor
+  );
 
   const warnHighlight = ratioHighlight !== null && ratioHighlight < 4.5;
   const warnSelected = ratioSelected !== null && ratioSelected < 4.5;
@@ -210,9 +264,12 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
       aria-describedby="settings-help"
       className="p-2 space-y-3"
     >
-      <h2 id="settings-title" className="text-base font-semibold">Settings</h2>
+      <h2 id="settings-title" className="text-base font-semibold">
+        Settings
+      </h2>
       <p id="settings-help" className="text-xs text-slate-400">
-        Tune highlight behavior and colors. All controls are keyboard-accessible; contrast warnings help choose readable colors.
+        Tune highlight behavior and colors. All controls are
+        keyboard-accessible; contrast warnings help choose readable colors.
       </p>
 
       {/* Keyboard shortcut section moved above profiles */}
@@ -231,7 +288,10 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
               {statusText}
             </span>
             {checking && (
-              <span aria-hidden className="w-3 h-3 rounded-full border-2 border-slate-600 border-t-blue-400 animate-spin" />
+              <span
+                aria-hidden
+                className="w-3 h-3 rounded-full border-2 border-slate-600 border-t-blue-400 animate-spin"
+              />
             )}
             <button
               onClick={openShortcuts}
@@ -244,7 +304,11 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
 
           <div className="col-span-2">
             <p className="text-xs text-slate-400" id="shortcutHelp">
-              Set a key for <span className="font-semibold">"Open Accessible Find In Page popup"</span> (not
+              Set a key for{" "}
+              <span className="font-semibold">
+                "Open Accessible Find In Page popup"
+              </span>{" "}
+              (not
               <span className="font-semibold"> "Activate the extension"</span>).
             </p>
           </div>
@@ -258,25 +322,35 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
           <select
             id="profile-select"
             className="text-sm bg-slate-900 text-gray-200 border border-slate-700 rounded px-2 py-1"
-            value={activeProfileId ?? ''}
+            value={activeProfileId ?? ""}
             onChange={(e) => onSelectProfile(e.target.value)}
             aria-describedby="profile-help"
           >
             {/* User profiles */}
-            {profiles.filter(p => !p.system).map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {profiles
+              .filter((p) => !p.system)
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
             {/* Separator and system optgroup */}
-            {profiles.some(p => p.system) && (
+            {profiles.some((p) => p.system) && (
               <optgroup label="System">
-                {profiles.filter(p => p.system).map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                {profiles
+                  .filter((p) => p.system)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
               </optgroup>
             )}
           </select>
         ) : (
-          <span className="text-xs border border-slate-700 rounded px-2 py-1 text-gray-200 bg-slate-900">Default</span>
+          <span className="text-xs border border-slate-700 rounded px-2 py-1 text-gray-200 bg-slate-900">
+            Default
+          </span>
         )}
 
         {!renaming ? (
@@ -284,21 +358,36 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
             <button
               className="text-xs border border-slate-700 text-gray-200 rounded px-2 py-1 hover:bg-slate-800"
               onClick={() => onCreateProfile()}
-              aria-label={activeIsSystem ? "Duplicate system profile" : "Create new profile"}
-              title={activeIsSystem ? "Duplicate system profile" : "Create new profile"}
+              aria-label={
+                activeIsSystem
+                  ? "Duplicate system profile"
+                  : "Create new profile"
+              }
+              title={
+                activeIsSystem
+                  ? "Duplicate system profile"
+                  : "Create new profile"
+              }
             >
               {activeIsSystem ? "⧉ Duplicate" : "➕ New"}
             </button>
             <button
               className="text-xs border border-slate-700 text-gray-200 rounded px-2 py-1 hover:bg-slate-800 disabled:opacity-50"
               onClick={() => {
-                const current = profiles.find((p) => p.id === (activeProfileId ?? ''));
-                setRenameVal(current?.name ?? '');
+                const current = profiles.find(
+                  (p) => p.id === (activeProfileId ?? "")
+                );
+                setRenameVal(current?.name ?? "");
                 setRenaming(true);
               }}
               aria-label="Rename profile"
               title="Rename profile"
-              disabled={!activeProfileId || profiles.length === 0 || (profiles.find(p => p.id === activeProfileId)?.system ?? false)}
+              disabled={
+                !activeProfileId ||
+                profiles.length === 0 ||
+                (profiles.find((p) => p.id === activeProfileId)?.system ??
+                  false)
+              }
             >
               ✏️ Rename
             </button>
@@ -306,12 +395,17 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
               className="text-xs border border-red-700 text-red-200 rounded px-2 py-1 hover:bg-red-900/30 disabled:opacity-50"
               onClick={() => {
                 if (!activeProfileId) return;
-                const ok = window.confirm('Delete current profile?');
+                const ok = window.confirm("Delete current profile?");
                 if (ok) onDeleteProfile(activeProfileId);
               }}
               aria-label="Delete profile"
               title="Delete profile"
-              disabled={!activeProfileId || profiles.filter(p => !p.system).length <= 1 || (profiles.find(p => p.id === activeProfileId)?.system ?? false)}
+              disabled={
+                !activeProfileId ||
+                profiles.filter((p) => !p.system).length <= 1 ||
+                (profiles.find((p) => p.id === activeProfileId)?.system ??
+                  false)
+              }
             >
               🗑️ Delete
             </button>
@@ -323,11 +417,12 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
               value={renameVal}
               onChange={(e) => setRenameVal(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === "Enter") {
                   const name = renameVal.trim();
-                  if (name && activeProfileId) onRenameProfile(activeProfileId, name);
+                  if (name && activeProfileId)
+                    onRenameProfile(activeProfileId, name);
                   setRenaming(false);
-                } else if (e.key === 'Escape') {
+                } else if (e.key === "Escape") {
                   setRenaming(false);
                 }
               }}
@@ -338,7 +433,8 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
               className="text-xs bg-blue-600 hover:bg-blue-700 border border-blue-600 text-white rounded px-2 py-1"
               onClick={() => {
                 const name = renameVal.trim();
-                if (name && activeProfileId) onRenameProfile(activeProfileId, name);
+                if (name && activeProfileId)
+                  onRenameProfile(activeProfileId, name);
                 setRenaming(false);
               }}
             >
@@ -352,7 +448,9 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
             </button>
           </div>
         )}
-        <p id="profile-help" className="text-xs text-slate-400">Manage your settings profiles.</p>
+        <p id="profile-help" className="text-xs text-slate-400">
+          Manage your settings profiles.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -379,7 +477,9 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
             id="numSurroundingWords"
             value={settings.numSurroundingWords}
             min={0}
-            onChange={(val) => onChange({ ...settings, numSurroundingWords: val })}
+            onChange={(val) =>
+              onChange({ ...settings, numSurroundingWords: val })
+            }
           />
         </Section>
 
@@ -414,7 +514,9 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
           <ColorInput
             id="highlightTextColor"
             value={settings.highlightTextColor}
-            onChange={(val) => onChange({ ...settings, highlightTextColor: val })}
+            onChange={(val) =>
+              onChange({ ...settings, highlightTextColor: val })
+            }
             describedBy="highlight-contrast"
           />
 
@@ -426,13 +528,17 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
           />
 
           <div className="col-span-2 text-xs text-slate-300">Preview</div>
-          <div className="col-span-2 flex items-center gap-2" aria-live="polite">
+          <div
+            className="col-span-2 flex items-center gap-2"
+            aria-live="polite"
+          >
             <div
               className="rounded px-2 py-1 border"
               style={{
                 background: settings.highlightBgColor,
                 color: settings.highlightTextColor,
                 borderColor: settings.outlineColor,
+                borderWidth: `${settings.borderWidth}px`,
               }}
               aria-label="Highlight preview example"
             >
@@ -441,7 +547,9 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
           </div>
           <div className="col-span-2">
             <span id="highlight-contrast" className="text-xs text-slate-300">
-              Text–background contrast: {ratioHighlight ? ratioHighlight.toFixed(2) : "n/a"} {warnHighlight ? "(below 4.5:1)" : ""}
+              Text–background contrast:{" "}
+              {ratioHighlight ? ratioHighlight.toFixed(2) : "n/a"}{" "}
+              {warnHighlight ? "(below 4.5:1)" : ""}
             </span>
           </div>
         </Section>
@@ -459,7 +567,9 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
           <ColorInput
             id="selectedTextColor"
             value={settings.selectedTextColor}
-            onChange={(val) => onChange({ ...settings, selectedTextColor: val })}
+            onChange={(val) =>
+              onChange({ ...settings, selectedTextColor: val })
+            }
             describedBy="selected-contrast"
           />
 
@@ -467,17 +577,23 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
           <ColorInput
             id="selectedBorderColor"
             value={settings.selectedBorderColor}
-            onChange={(val) => onChange({ ...settings, selectedBorderColor: val })}
+            onChange={(val) =>
+              onChange({ ...settings, selectedBorderColor: val })
+            }
           />
 
           <div className="col-span-2 text-xs text-slate-300">Preview</div>
-          <div className="col-span-2 flex items-center gap-2" aria-live="polite">
+          <div
+            className="col-span-2 flex items-center gap-2"
+            aria-live="polite"
+          >
             <div
               className="rounded px-2 py-1 border"
               style={{
                 background: settings.selectedBgColor,
                 color: settings.selectedTextColor,
                 borderColor: settings.selectedBorderColor,
+                borderWidth: `${settings.borderWidth}px`,
               }}
               aria-label="Selected preview example"
             >
@@ -486,7 +602,9 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, pr
           </div>
           <div className="col-span-2">
             <span id="selected-contrast" className="text-xs text-slate-300">
-              Text–background contrast: {ratioSelected ? ratioSelected.toFixed(2) : "n/a"} {warnSelected ? "(below 4.5:1)" : ""}
+              Text–background contrast:{" "}
+              {ratioSelected ? ratioSelected.toFixed(2) : "n/a"}{" "}
+              {warnSelected ? "(below 4.5:1)" : ""}
             </span>
           </div>
         </Section>
