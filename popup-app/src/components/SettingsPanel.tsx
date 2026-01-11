@@ -14,12 +14,21 @@ export type Settings = {
   selectedTextColor: string;
 };
 
+type ProfileSummary = { id: string; name: string; system?: boolean };
+
 type SettingsPanelProps = {
   settings: Settings;
   onChange: (next: Settings) => void;
   onClose: () => void;
   onReset: () => void;
   onSave: () => void;
+  profiles: ProfileSummary[];
+  activeProfileId: string | null;
+  onSelectProfile: (id: string) => void;
+  onCreateProfile: () => void;
+  onRenameProfile: (id: string, name: string) => void;
+  onDeleteProfile: (id: string) => void;
+  activeIsSystem?: boolean;
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -121,10 +130,12 @@ function contrastRatio(bgHex: string, fgHex: string): number | null {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-export function SettingsPanel({ settings, onChange, onClose, onReset, onSave }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onChange, onClose, onReset, onSave, profiles, activeProfileId, onSelectProfile, onCreateProfile, onRenameProfile, onDeleteProfile, activeIsSystem }: SettingsPanelProps) {
   // Shortcut status
   const [shortcut, setShortcut] = useState<string | null>(null);
   const [checking, setChecking] = useState<boolean>(true);
+  const [renaming, setRenaming] = useState<boolean>(false);
+  const [renameVal, setRenameVal] = useState<string>("");
 
   function getShortcutsUrl(): string {
     const ua = navigator.userAgent.toLowerCase();
@@ -204,6 +215,146 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave }: 
         Tune highlight behavior and colors. All controls are keyboard-accessible; contrast warnings help choose readable colors.
       </p>
 
+      {/* Keyboard shortcut section moved above profiles */}
+      <div>
+        <Section title="Keyboard Shortcut">
+          <Label id="shortcutRow">Shortcut</Label>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span
+              aria-live="polite"
+              className={`text-xs rounded-full border px-2 py-0.5 ${
+                shortcut
+                  ? "border-emerald-500 text-emerald-300 bg-emerald-900/20"
+                  : "border-amber-500 text-amber-300 bg-amber-900/20"
+              }`}
+            >
+              {statusText}
+            </span>
+            {checking && (
+              <span aria-hidden className="w-3 h-3 rounded-full border-2 border-slate-600 border-t-blue-400 animate-spin" />
+            )}
+            <button
+              onClick={openShortcuts}
+              className="text-xs bg-blue-600 hover:bg-blue-700 border border-blue-600 text-white rounded px-2 py-1"
+              aria-describedby="shortcutHelp"
+            >
+              Open shortcut settings
+            </button>
+          </div>
+
+          <div className="col-span-2">
+            <p className="text-xs text-slate-400" id="shortcutHelp">
+              Set a key for <span className="font-semibold">"Open Accessible Find In Page popup"</span> (not
+              <span className="font-semibold"> "Activate the extension"</span>).
+            </p>
+          </div>
+        </Section>
+      </div>
+
+      {/* Profiles manager */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <label className="text-xs text-gray-300">Profile</label>
+        {profiles.length > 0 ? (
+          <select
+            id="profile-select"
+            className="text-sm bg-slate-900 text-gray-200 border border-slate-700 rounded px-2 py-1"
+            value={activeProfileId ?? ''}
+            onChange={(e) => onSelectProfile(e.target.value)}
+            aria-describedby="profile-help"
+          >
+            {/* User profiles */}
+            {profiles.filter(p => !p.system).map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+            {/* Separator and system optgroup */}
+            {profiles.some(p => p.system) && (
+              <optgroup label="System">
+                {profiles.filter(p => p.system).map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        ) : (
+          <span className="text-xs border border-slate-700 rounded px-2 py-1 text-gray-200 bg-slate-900">Default</span>
+        )}
+
+        {!renaming ? (
+          <div className="inline-flex items-center gap-1">
+            <button
+              className="text-xs border border-slate-700 text-gray-200 rounded px-2 py-1 hover:bg-slate-800"
+              onClick={() => onCreateProfile()}
+              aria-label={activeIsSystem ? "Duplicate system profile" : "Create new profile"}
+              title={activeIsSystem ? "Duplicate system profile" : "Create new profile"}
+            >
+              {activeIsSystem ? "⧉ Duplicate" : "➕ New"}
+            </button>
+            <button
+              className="text-xs border border-slate-700 text-gray-200 rounded px-2 py-1 hover:bg-slate-800 disabled:opacity-50"
+              onClick={() => {
+                const current = profiles.find((p) => p.id === (activeProfileId ?? ''));
+                setRenameVal(current?.name ?? '');
+                setRenaming(true);
+              }}
+              aria-label="Rename profile"
+              title="Rename profile"
+              disabled={!activeProfileId || profiles.length === 0 || (profiles.find(p => p.id === activeProfileId)?.system ?? false)}
+            >
+              ✏️ Rename
+            </button>
+            <button
+              className="text-xs border border-red-700 text-red-200 rounded px-2 py-1 hover:bg-red-900/30 disabled:opacity-50"
+              onClick={() => {
+                if (!activeProfileId) return;
+                const ok = window.confirm('Delete current profile?');
+                if (ok) onDeleteProfile(activeProfileId);
+              }}
+              aria-label="Delete profile"
+              title="Delete profile"
+              disabled={!activeProfileId || profiles.filter(p => !p.system).length <= 1 || (profiles.find(p => p.id === activeProfileId)?.system ?? false)}
+            >
+              🗑️ Delete
+            </button>
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-1">
+            <input
+              className="text-sm bg-slate-900 text-gray-200 border border-slate-700 rounded px-2 py-1"
+              value={renameVal}
+              onChange={(e) => setRenameVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const name = renameVal.trim();
+                  if (name && activeProfileId) onRenameProfile(activeProfileId, name);
+                  setRenaming(false);
+                } else if (e.key === 'Escape') {
+                  setRenaming(false);
+                }
+              }}
+              aria-label="New profile name"
+              autoFocus
+            />
+            <button
+              className="text-xs bg-blue-600 hover:bg-blue-700 border border-blue-600 text-white rounded px-2 py-1"
+              onClick={() => {
+                const name = renameVal.trim();
+                if (name && activeProfileId) onRenameProfile(activeProfileId, name);
+                setRenaming(false);
+              }}
+            >
+              Save
+            </button>
+            <button
+              className="text-xs border border-slate-700 text-gray-200 rounded px-2 py-1 hover:bg-slate-800"
+              onClick={() => setRenaming(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+        <p id="profile-help" className="text-xs text-slate-400">Manage your settings profiles.</p>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <Section title="Blinking">
           <Label id="blinkInterval">Interval (ms)</Label>
@@ -274,6 +425,7 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave }: 
             onChange={(val) => onChange({ ...settings, outlineColor: val })}
           />
 
+          <div className="col-span-2 text-xs text-slate-300">Preview</div>
           <div className="col-span-2 flex items-center gap-2" aria-live="polite">
             <div
               className="rounded px-2 py-1 border"
@@ -282,13 +434,14 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave }: 
                 color: settings.highlightTextColor,
                 borderColor: settings.outlineColor,
               }}
+              aria-label="Highlight preview example"
             >
               Sample text
             </div>
           </div>
           <div className="col-span-2">
             <span id="highlight-contrast" className="text-xs text-slate-300">
-              Contrast: {ratioHighlight ? ratioHighlight.toFixed(2) : "n/a"} {warnHighlight ? "(below 4.5:1)" : ""}
+              Text–background contrast: {ratioHighlight ? ratioHighlight.toFixed(2) : "n/a"} {warnHighlight ? "(below 4.5:1)" : ""}
             </span>
           </div>
         </Section>
@@ -317,6 +470,7 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave }: 
             onChange={(val) => onChange({ ...settings, selectedBorderColor: val })}
           />
 
+          <div className="col-span-2 text-xs text-slate-300">Preview</div>
           <div className="col-span-2 flex items-center gap-2" aria-live="polite">
             <div
               className="rounded px-2 py-1 border"
@@ -325,52 +479,17 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave }: 
                 color: settings.selectedTextColor,
                 borderColor: settings.selectedBorderColor,
               }}
+              aria-label="Selected preview example"
             >
               Selected text
             </div>
           </div>
           <div className="col-span-2">
             <span id="selected-contrast" className="text-xs text-slate-300">
-              Contrast: {ratioSelected ? ratioSelected.toFixed(2) : "n/a"} {warnSelected ? "(below 4.5:1)" : ""}
+              Text–background contrast: {ratioSelected ? ratioSelected.toFixed(2) : "n/a"} {warnSelected ? "(below 4.5:1)" : ""}
             </span>
           </div>
         </Section>
-
-        {/* Keyboard shortcut section */}
-        <div className="col-span-2">
-          <Section title="Keyboard Shortcut">
-            <Label id="shortcutRow">Shortcut</Label>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span
-                aria-live="polite"
-                className={`text-xs rounded-full border px-2 py-0.5 ${
-                  shortcut
-                    ? "border-emerald-500 text-emerald-300 bg-emerald-900/20"
-                    : "border-amber-500 text-amber-300 bg-amber-900/20"
-                }`}
-              >
-                {statusText}
-              </span>
-              {checking && (
-                <span aria-hidden className="w-3 h-3 rounded-full border-2 border-slate-600 border-t-blue-400 animate-spin" />
-              )}
-              <button
-                onClick={openShortcuts}
-                className="text-xs bg-blue-600 hover:bg-blue-700 border border-blue-600 text-white rounded px-2 py-1"
-                aria-describedby="shortcutHelp"
-              >
-                Open shortcut settings
-              </button>
-            </div>
-
-            <div className="col-span-2">
-              <p className="text-xs text-slate-400" id="shortcutHelp">
-                Set a key for <span className="font-semibold">"Open Accessible Find In Page popup"</span> (not
-                <span className="font-semibold"> "Activate the extension"</span>).
-              </p>
-            </div>
-          </Section>
-        </div>
       </div>
 
       <div className="flex justify-end gap-2 mt-2">
@@ -388,6 +507,7 @@ export function SettingsPanel({ settings, onChange, onClose, onReset, onSave }: 
         </button>
         <button
           className="bg-blue-600 text-white rounded px-3 py-1 text-sm disabled:opacity-50 hover:bg-blue-700"
+          disabled={!!activeIsSystem}
           onClick={onSave}
         >
           Save

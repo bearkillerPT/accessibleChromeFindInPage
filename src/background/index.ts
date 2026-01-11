@@ -1,4 +1,4 @@
-import { defaultSettings, getSettings, setSettings } from './settings.js';
+import { defaultSettings, getSettings, setSettings, getProfilesState, setActiveProfile, createProfile, renameProfile, deleteProfile } from './settings.js';
 import type { Settings } from './settings.js';
 import { blinkLinesWithSearchTerm, navigateMatch } from './search.js';
 
@@ -23,6 +23,11 @@ chrome.runtime.onInstalled.addListener((details) => {
 type RuntimeMessage =
   | { action: 'getSettings' }
   | { action: 'setSettings'; settings: Settings }
+  | { action: 'getProfiles' }
+  | { action: 'setActiveProfile'; profileId: string }
+  | { action: 'createProfile'; name?: string; baseSettings?: Settings }
+  | { action: 'renameProfile'; profileId: string; name: string }
+  | { action: 'deleteProfile'; profileId: string }
   | { action: 'findInPage'; searchTerm: string }
   | { action: 'navigateMatch'; direction: 'next' | 'prev' }
   | { action: 'openShortcuts' }
@@ -43,6 +48,57 @@ chrome.runtime.onMessage.addListener(
         sendResponse({ ok: true });
       });
       return true; // async response
+    }
+
+    if (action === 'getProfiles') {
+      getProfilesState().then((state) => {
+        // Keep local active settings in sync
+        const active = state.profiles.find((p) => p.id === state.activeProfileId) || state.profiles[0];
+        settings = active.settings;
+        sendResponse({ ok: true, state });
+      });
+      return true;
+    }
+
+    if (action === 'setActiveProfile') {
+      const profileId = (message as any).profileId as string;
+      setActiveProfile(profileId).then((state) => {
+        const active = state.profiles.find((p) => p.id === state.activeProfileId) || state.profiles[0];
+        settings = active.settings;
+        sendResponse({ ok: true, state });
+      });
+      return true;
+    }
+
+    if (action === 'createProfile') {
+      const name = (message as any).name as string | undefined;
+      const base = (message as any).baseSettings as Settings | undefined;
+      createProfile(name ?? 'New Profile', base).then((state) => {
+        const active = state.profiles.find((p) => p.id === state.activeProfileId) || state.profiles[0];
+        settings = active.settings;
+        sendResponse({ ok: true, state });
+      });
+      return true;
+    }
+
+    if (action === 'renameProfile') {
+      const { profileId, name } = message as any;
+      renameProfile(profileId, name).then((state) => {
+        const active = state.profiles.find((p) => p.id === state.activeProfileId) || state.profiles[0];
+        settings = active.settings;
+        sendResponse({ ok: true, state });
+      });
+      return true;
+    }
+
+    if (action === 'deleteProfile') {
+      const { profileId } = message as any;
+      deleteProfile(profileId).then((state) => {
+        const active = state.profiles.find((p) => p.id === state.activeProfileId) || state.profiles[0];
+        settings = active.settings;
+        sendResponse({ ok: true, state });
+      });
+      return true;
     }
 
     if (action === 'resetSettings') {

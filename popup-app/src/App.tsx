@@ -31,6 +31,8 @@ type NavigateResponse = {
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [profiles, setProfiles] = useState<Array<{ id: string; name: string; system?: boolean }>>([]);
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [count, setCount] = useState(0);
@@ -67,14 +69,38 @@ export default function App() {
 
   useEffect(() => {
     chrome.runtime.sendMessage(
-      { action: "getSettings" },
-      (response: Settings | null) => {
-        if (response) {
-          setSettings(response);
+      { action: "getProfiles" },
+      (response: { ok: boolean; state?: { profiles: Array<{ id: string; name: string; settings: Settings }>; activeProfileId: string } } | null) => {
+        const state = response?.state;
+        if (state && Array.isArray(state.profiles) && state.profiles.length > 0) {
+          setProfiles(state.profiles.map(p => ({ id: p.id, name: p.name, system: (p as any).system || false })));
+          setActiveProfileId(state.activeProfileId);
+          const active = state.profiles.find(p => p.id === state.activeProfileId) || state.profiles[0];
+          setSettings(active.settings);
+        } else {
+          // Fallback to legacy single settings (background will migrate when first profile action occurs)
+          chrome.runtime.sendMessage({ action: "getSettings" }, (s: Settings | null) => {
+            if (s) setSettings(s);
+          });
         }
       }
     );
   }, []);
+
+  function refreshProfilesAndActiveSettings(): void {
+    chrome.runtime.sendMessage(
+      { action: 'getProfiles' },
+      (response: { ok: boolean; state?: { profiles: Array<{ id: string; name: string; settings: Settings }>; activeProfileId: string } } | null) => {
+        const state = response?.state;
+        if (state && Array.isArray(state.profiles) && state.profiles.length > 0) {
+          setProfiles(state.profiles.map(p => ({ id: p.id, name: p.name, system: (p as any).system || false })));
+          setActiveProfileId(state.activeProfileId);
+          const active = state.profiles.find(p => p.id === state.activeProfileId) || state.profiles[0];
+          setSettings(active.settings);
+        }
+      }
+    );
+  }
 
   // Autofocus the search input when the popup opens and respond to focus requests
   useEffect(() => {
@@ -173,6 +199,11 @@ export default function App() {
   }, []);
 
   const canSave = useMemo(() => !!settings, [settings]);
+  const activeIsSystem = useMemo(() => {
+    if (!activeProfileId) return false;
+    const p = profiles.find(p => p.id === activeProfileId);
+    return !!p?.system;
+  }, [activeProfileId, profiles]);
 
   function saveSettings() {
     if (!settings) return;
@@ -182,6 +213,17 @@ export default function App() {
       if (searchTerm && searchTerm.trim().length > 0) {
         findMutation.mutate(searchTerm);
       }
+      // Refresh profiles state to reflect any normalization
+      chrome.runtime.sendMessage(
+        { action: "getProfiles" },
+        (response: { ok: boolean; state?: { profiles: Array<{ id: string; name: string; settings: Settings }>; activeProfileId: string } } | null) => {
+          const state = response?.state;
+          if (state) {
+            setProfiles(state.profiles.map(p => ({ id: p.id, name: p.name })));
+            setActiveProfileId(state.activeProfileId);
+          }
+        }
+      );
     });
   }
 
@@ -363,10 +405,49 @@ export default function App() {
                       if (searchTerm && searchTerm.trim().length > 0) {
                         findMutation.mutate(searchTerm);
                       }
+                      // Update profiles list after reset
+                      chrome.runtime.sendMessage({ action: 'getProfiles' }, (response: { ok: boolean; state?: { profiles: Array<{ id: string; name: string; settings: Settings }>; activeProfileId: string } } | null) => {
+                        const state = response?.state;
+                        if (state) {
+                          setProfiles(state.profiles.map(p => ({ id: p.id, name: p.name })));
+                          setActiveProfileId(state.activeProfileId);
+                        }
+                      });
                     }
                   });
                 }}
                 onSave={saveSettings}
+                profiles={profiles}
+                activeProfileId={activeProfileId}
+                activeIsSystem={activeIsSystem}
+                onSelectProfile={(id) => {
+                  chrome.runtime.sendMessage({ action: 'setActiveProfile', profileId: id }, (_response: any) => {
+                    refreshProfilesAndActiveSettings();
+                    if (searchTerm && searchTerm.trim().length > 0) findMutation.mutate(searchTerm);
+                  });
+                }}
+                onCreateProfile={() => {
+                  // Optimistic UI update for immediate feedback
+                  const tempId = 'local-' + Math.floor(Date.now() + Math.random() * 1e6).toString(36);
+                  const tempName = 'New Profile';
+                  setProfiles((prev) => [...prev, { id: tempId, name: tempName }]);
+                  setActiveProfileId(tempId);
+                  // Persist via background
+                  chrome.runtime.sendMessage({ action: 'createProfile', baseSettings: settings as Settings }, (_response: any) => {
+                    refreshProfilesAndActiveSettings();
+                  });
+                }}
+                onRenameProfile={(id, name) => {
+                  chrome.runtime.sendMessage({ action: 'renameProfile', profileId: id, name }, (_response: any) => {
+                    refreshProfilesAndActiveSettings();
+                  });
+                }}
+                onDeleteProfile={(id) => {
+                  chrome.runtime.sendMessage({ action: 'deleteProfile', profileId: id }, (_response: any) => {
+                    refreshProfilesAndActiveSettings();
+                    if (searchTerm && searchTerm.trim().length > 0) findMutation.mutate(searchTerm);
+                  });
+                }}
               />
             </div>
           </motion.div>
