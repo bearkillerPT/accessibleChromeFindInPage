@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
+import { SettingsPanel, type Settings as PanelSettings } from "./components/SettingsPanel";
 
 type Settings = {
   blinkInterval: number;
@@ -37,7 +38,6 @@ export default function App() {
   const [needsShortcut, setNeedsShortcut] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  // No debounce; background/page handle cancellation
 
   const findMutation = useMutation<FindResponse | null, unknown, string>({
     mutationFn: async (term: string) =>
@@ -233,7 +233,10 @@ export default function App() {
   }
 
   return (
-    <div ref={rootRef} className="flex flex-col p-2 gap-2 bg-slate-900 text-gray-200 overflow-hidden border border-slate-700 rounded-md shadow-lg">
+    <div
+      ref={rootRef}
+      className="flex flex-col p-2 gap-2 bg-slate-900 text-gray-200 overflow-hidden border border-slate-700 rounded-md shadow-lg"
+    >
       {needsShortcut && (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs rounded p-2">
           <div className="flex items-center justify-between gap-2">
@@ -270,30 +273,39 @@ export default function App() {
           </div>
         </div>
       )}
-      <div className="flex items-center gap-2">
-        <button
+      <div className="flex items-center gap-2 w-[384px]">
+          <button
           className="text-xl"
           title="Settings"
+          aria-label="Toggle settings"
+          aria-expanded={open}
+          aria-controls="settings-panel"
           onClick={() => setOpen((o) => !o)}
         >
           ⚙️
         </button>
-        <input
-          ref={inputRef}
-          autoFocus
-          value={searchTerm}
-          onChange={(e) => onTermChange(e.target.value)}
-          onKeyDown={onInputKeyDown}
-          placeholder="Find in Page"
-          className="flex-1 min-w-0 border border-slate-700 rounded px-2 py-1 text-sm bg-slate-800 text-gray-200 placeholder:text-slate-400"
-        />
+        <div className="flex-1 min-w-0">
+          <label htmlFor="search-input" className="sr-only">Search term</label>
+          <input
+            id="search-input"
+            ref={inputRef}
+            autoFocus
+            value={searchTerm}
+            onChange={(e) => onTermChange(e.target.value)}
+            onKeyDown={onInputKeyDown}
+            placeholder="Find in Page"
+            aria-describedby="search-help"
+            className="w-full border border-slate-700 rounded px-2 py-1 text-sm bg-slate-800 text-gray-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p id="search-help" className="sr-only">Type to search. Press Enter for next, Shift+Enter for previous.</p>
+        </div>
         <div className="flex items-center gap-1">
           {findMutation.isPending ? (
             <span className="text-xs text-slate-400 min-w-12 text-right inline-flex items-center justify-end">
               <span className="inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
             </span>
           ) : (
-            <span className="text-xs text-gray-300 min-w-12 text-right">
+            <span className="text-s text-gray-300 min-w-12 text-right" aria-live="polite" aria-atomic="true">
               {currentIndex !== null && count > 0
                 ? `${currentIndex + 1}/${count}`
                 : `${count}/${count}`}
@@ -302,6 +314,7 @@ export default function App() {
           <button
             className="border border-slate-700 rounded px-1 text-xs bg-slate-800 hover:bg-slate-700"
             title="Previous"
+            aria-label="Previous match"
             onClick={onPrev}
             disabled={count === 0 || findMutation.isPending}
           >
@@ -310,6 +323,7 @@ export default function App() {
           <button
             className="border border-slate-700 rounded px-1 text-xs bg-slate-800 hover:bg-slate-700"
             title="Next"
+            aria-label="Next match"
             onClick={onNext}
             disabled={count === 0 || findMutation.isPending}
           >
@@ -318,6 +332,7 @@ export default function App() {
           <button
             className="border border-slate-700 rounded px-2 text-sm ml-1 bg-slate-800 hover:bg-slate-700"
             title="Close"
+            aria-label="Close popup"
             onClick={onClose}
           >
             ✖
@@ -334,164 +349,25 @@ export default function App() {
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.2, 0.65, 0.3, 0.9] }}
             style={{ overflow: "hidden" }}
-            className="border border-slate-700 rounded bg-slate-800"
+            className="border border-slate-700 rounded bg-slate-800 min-w-[540px] max-w-[680px]"
           >
-            <div className="p-2 grid grid-cols-2 gap-2">
-              <label className="text-sm col-span-2 font-semibold">Blinking</label>
-          <label className="text-xs">Interval (ms)</label>
-          <input
-            type="number"
-            className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200"
-            min={100}
-            step={50}
-            value={settings.blinkInterval}
-            onChange={(e) =>
-              setSettings({
-                ...settings!,
-                blinkInterval: Number(e.target.value),
-              })
-            }
-          />
-          <label className="text-xs"># Blinks</label>
-          <input
-            type="number"
-            className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200"
-            min={1}
-            value={settings.numBlinks}
-            onChange={(e) =>
-              setSettings({ ...settings!, numBlinks: Number(e.target.value) })
-            }
-          />
-          <label className="text-xs">Surrounding words</label>
-          <input
-            type="number"
-            className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200"
-            min={0}
-            value={settings.numSurroundingWords}
-            onChange={(e) =>
-              setSettings({
-                ...settings!,
-                numSurroundingWords: Number(e.target.value),
-              })
-            }
-          />
-
-          <label className="text-sm col-span-2 font-semibold mt-1">
-            Colors
-          </label>
-          <label className="text-xs">Highlight background</label>
-          <input
-            type="color"
-            className="border border-slate-700 rounded px-2 py-1 bg-slate-900"
-            value={settings.highlightBgColor}
-            onChange={(e) =>
-              setSettings({ ...settings!, highlightBgColor: e.target.value })
-            }
-          />
-          <label className="text-xs">Highlight text</label>
-          <input
-            type="color"
-            className="border border-slate-700 rounded px-2 py-1 bg-slate-900"
-            value={settings.highlightTextColor}
-            onChange={(e) =>
-              setSettings({ ...settings!, highlightTextColor: e.target.value })
-            }
-          />
-          <label className="text-xs">Border color</label>
-          <input
-            type="color"
-            className="border border-slate-700 rounded px-2 py-1 bg-slate-900"
-            value={settings.outlineColor}
-            onChange={(e) =>
-              setSettings({ ...settings!, outlineColor: e.target.value })
-            }
-          />
-          <label className="text-xs">Border width (px)</label>
-          <input
-            type="number"
-            className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200"
-            min={1}
-            value={settings.borderWidth}
-            onChange={(e) =>
-              setSettings({
-                ...settings!,
-                borderWidth: Number(e.target.value),
-              })
-            }
-          />
-
-          <label className="text-xs">Match font size (px)</label>
-          <input
-            type="number"
-            className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200"
-            min={8}
-            value={settings.matchFontSize}
-            onChange={(e) =>
-              setSettings({
-                ...settings!,
-                matchFontSize: Number(e.target.value),
-              })
-            }
-          />
-          <label className="text-xs">Selected background</label>
-          <input
-            type="color"
-            className="border border-slate-700 rounded px-2 py-1 bg-slate-900"
-            value={settings.selectedBgColor}
-            onChange={(e) =>
-              setSettings({ ...settings!, selectedBgColor: e.target.value })
-            }
-          />
-          <label className="text-xs">Selected text</label>
-          <input
-            type="color"
-            className="border border-slate-700 rounded px-2 py-1 bg-slate-900"
-            value={settings.selectedTextColor}
-            onChange={(e) =>
-              setSettings({ ...settings!, selectedTextColor: e.target.value })
-            }
-          />
-          <label className="text-xs">Selected border color</label>
-          <input
-            type="color"
-            className="border border-slate-700 rounded px-2 py-1 bg-slate-900"
-            value={settings.selectedBorderColor}
-            onChange={(e) =>
-              setSettings({ ...settings!, selectedBorderColor: e.target.value })
-            }
-          />
-
-              <div className="col-span-2 flex justify-end gap-2 mt-2">
-            <button
-              className="border border-slate-700 rounded px-3 py-1 text-sm bg-slate-900 hover:bg-slate-800"
-              onClick={() => setOpen(false)}
-            >
-              Close
-            </button>
-            <button
-              className="border border-slate-700 rounded px-3 py-1 text-sm bg-slate-900 hover:bg-slate-800"
-              onClick={() => {
-                chrome.runtime.sendMessage({ action: 'resetSettings' }, (resp: { ok: boolean; settings?: Settings } | null) => {
-                  if (resp && resp.ok && resp.settings) {
-                    setSettings(resp.settings);
-                    // Re-run search if term is active to apply defaults immediately
-                    if (searchTerm && searchTerm.trim().length > 0) {
-                      findMutation.mutate(searchTerm);
+            <div className="p-2">
+              <SettingsPanel
+                settings={settings as PanelSettings}
+                onChange={(next) => setSettings(next)}
+                onClose={() => setOpen(false)}
+                onReset={() => {
+                  chrome.runtime.sendMessage({ action: 'resetSettings' }, (resp: { ok: boolean; settings?: Settings } | null) => {
+                    if (resp && resp.ok && resp.settings) {
+                      setSettings(resp.settings);
+                      if (searchTerm && searchTerm.trim().length > 0) {
+                        findMutation.mutate(searchTerm);
+                      }
                     }
-                  }
-                });
-              }}
-            >
-              Reset to defaults
-            </button>
-            <button
-              className="bg-blue-600 text-white rounded px-3 py-1 text-sm disabled:opacity-50 hover:bg-blue-700"
-              onClick={saveSettings}
-              disabled={!canSave}
-            >
-              Save
-            </button>
-              </div>
+                  });
+                }}
+                onSave={saveSettings}
+              />
             </div>
           </motion.div>
         )}

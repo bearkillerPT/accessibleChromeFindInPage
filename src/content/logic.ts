@@ -1,3 +1,5 @@
+import { defaultSettings } from "../background/settings.js";
+
 export async function performSearch(
   searchTerm: string,
   blinkInterval: number,
@@ -11,16 +13,22 @@ export async function performSearch(
   selectedBgColor: string,
   selectedBorderColor: string,
   selectedTextColor: string
-): Promise<{ blinkIntervalId: number | null; count: number; currentIndex: number | null }> {
+): Promise<{
+  blinkIntervalId: number | null;
+  count: number;
+  currentIndex: number | null;
+}> {
   // Cancellation token management
   const getActiveToken = (): number | null =>
-    (window as unknown as { __accessibleFindActiveToken?: number | null }).
-      __accessibleFindActiveToken ?? null;
+    (window as unknown as { __accessibleFindActiveToken?: number | null })
+      .__accessibleFindActiveToken ?? null;
   const setActiveToken = (token: number | null): void => {
-    (window as unknown as { __accessibleFindActiveToken?: number | null }).
-      __accessibleFindActiveToken = token;
+    (
+      window as unknown as { __accessibleFindActiveToken?: number | null }
+    ).__accessibleFindActiveToken = token;
   };
-  const generateToken = (): number => Math.floor(Date.now() ^ Math.random() * 1e9);
+  const generateToken = (): number =>
+    Math.floor(Date.now() ^ (Math.random() * 1e9));
   // Helpers to manage the blink interval id stored on window
   const getBlinkIntervalId = (): number | null =>
     (window as unknown as { __accessibleFindBlinkIntervalId?: number | null })
@@ -45,9 +53,7 @@ export async function performSearch(
   const isCancelled = (): boolean => getActiveToken() !== myToken;
 
   const removeBlinkingStyles = (): void => {
-    const blinkingElements = document.querySelectorAll(
-      ".blink, .blink-off"
-    );
+    const blinkingElements = document.querySelectorAll(".blink, .blink-off");
     blinkingElements.forEach((element) => {
       const parent = element.parentNode as HTMLElement | null;
       if (!parent) return;
@@ -80,7 +86,8 @@ export async function performSearch(
       if (ariaHidden === "true") return false;
 
       const style = window.getComputedStyle(cur);
-      if (style.display === "none" || style.visibility === "hidden") return false;
+      if (style.display === "none" || style.visibility === "hidden")
+        return false;
       if (parseFloat(style.opacity || "1") === 0) return false;
       const contentVisibility = style.getPropertyValue("content-visibility");
       if (contentVisibility === "hidden") return false;
@@ -111,20 +118,22 @@ export async function performSearch(
   };
 
   const getMatches = (): HTMLElement[] =>
-    (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).
-      __accessibleFindMatches ?? [];
+    (window as unknown as { __accessibleFindMatches?: HTMLElement[] })
+      .__accessibleFindMatches ?? [];
 
   const setMatches = (m: HTMLElement[]): void => {
-    (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).
-      __accessibleFindMatches = m;
+    (
+      window as unknown as { __accessibleFindMatches?: HTMLElement[] }
+    ).__accessibleFindMatches = m;
   };
   const getCurrentIndex = (): number | null =>
-    (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
-      __accessibleFindCurrentIndex ?? null;
-  
+    (window as unknown as { __accessibleFindCurrentIndex?: number | null })
+      .__accessibleFindCurrentIndex ?? null;
+
   const setCurrentIndex = (idx: number | null): void => {
-    (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
-      __accessibleFindCurrentIndex = idx;
+    (
+      window as unknown as { __accessibleFindCurrentIndex?: number | null }
+    ).__accessibleFindCurrentIndex = idx;
   };
 
   const setElementsHighlighted = (
@@ -133,17 +142,29 @@ export async function performSearch(
   ): void => {
     elements.forEach((element) => {
       const el = element as HTMLElement;
-      const styles = (window as unknown as { __accessibleFindStyles?: {
-        highlightBgColor: string; highlightTextColor: string; selectedBgColor?: string; selectedTextColor?: string;
-      } }).__accessibleFindStyles ?? { highlightBgColor, highlightTextColor };
+      const styles = (
+        window as unknown as {
+          __accessibleFindStyles?: {
+            highlightBgColor: string;
+            highlightTextColor: string;
+            selectedBgColor?: string;
+            selectedTextColor?: string;
+          };
+        }
+      ).__accessibleFindStyles ?? { highlightBgColor, highlightTextColor };
       // If this element is the currently selected match, prefer selected colors when highlighting
-      const matches = (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).__accessibleFindMatches ?? [];
+      const matches =
+        (window as unknown as { __accessibleFindMatches?: HTMLElement[] })
+          .__accessibleFindMatches ?? [];
       const curIdx = getCurrentIndex();
-      const selectedEl = typeof curIdx === 'number' ? matches[curIdx] : undefined;
+      const selectedEl =
+        typeof curIdx === "number" ? matches[curIdx] : undefined;
       if (highlighted) {
         if (selectedEl && el === selectedEl) {
-          el.style.backgroundColor = styles.selectedBgColor ?? styles.highlightBgColor;
-          el.style.color = styles.selectedTextColor ?? styles.highlightTextColor;
+          el.style.backgroundColor =
+            styles.selectedBgColor ?? styles.highlightBgColor;
+          el.style.color =
+            styles.selectedTextColor ?? styles.highlightTextColor;
         } else {
           el.style.backgroundColor = styles.highlightBgColor;
           el.style.color = styles.highlightTextColor;
@@ -167,21 +188,47 @@ export async function performSearch(
       m.style.removeProperty("display");
       // Reset background/text to default highlight in case previous selection changed it
       try {
-        const st = (window as unknown as { __accessibleFindStyles?: {
-          highlightBgColor: string; highlightTextColor: string;
-        } }).__accessibleFindStyles;
-        if (st) { m.style.backgroundColor = st.highlightBgColor; m.style.color = st.highlightTextColor; }
+        const st = (
+          window as unknown as {
+            __accessibleFindStyles?: {
+              highlightBgColor: string;
+              highlightTextColor: string;
+            };
+          }
+        ).__accessibleFindStyles;
+        if (st) {
+          m.style.backgroundColor = st.highlightBgColor;
+          m.style.color = st.highlightTextColor;
+        }
       } catch {}
     });
     if (index === null) return;
     const el = matches[index];
     if (!el) return;
-    const st = (window as unknown as { __accessibleFindStyles?: {
-      borderWidth: number; outlineColor: string; selectedBorderColor?: string; selectedBgColor?: string; selectedTextColor?: string; highlightTextColor: string;
-    } }).__accessibleFindStyles ?? { borderWidth, outlineColor, selectedBorderColor, selectedBgColor, selectedTextColor, highlightTextColor };
-    el.style.outline = `${st.borderWidth}px solid ${st.selectedBorderColor ?? st.outlineColor}`;
+    const st = (
+      window as unknown as {
+        __accessibleFindStyles?: {
+          borderWidth: number;
+          outlineColor: string;
+          selectedBorderColor?: string;
+          selectedBgColor?: string;
+          selectedTextColor?: string;
+          highlightTextColor: string;
+        };
+      }
+    ).__accessibleFindStyles ?? {
+      borderWidth,
+      outlineColor,
+      selectedBorderColor,
+      selectedBgColor,
+      selectedTextColor,
+      highlightTextColor,
+    };
+    el.style.outline = `${st.borderWidth}px solid ${
+      st.selectedBorderColor ?? st.outlineColor
+    }`;
     // Add small margins so the outline doesn't overlap adjacent glyphs
-    el.style.display = 'inline-block';
+    el.style.display = "inline-block";
     el.style.marginLeft = `${st.borderWidth}px`;
     el.style.marginRight = `${st.borderWidth}px`;
     // Selected background override
@@ -222,10 +269,13 @@ export async function performSearch(
   const walkAndMatchAsync = async (
     root: Element,
     searchText: string
-  ): Promise<{ ops: Array<{ parent: HTMLElement; node: Node; html: string }> }> => {
+  ): Promise<{
+    ops: Array<{ parent: HTMLElement; node: Node; html: string }>;
+  }> => {
     const queue: Node[] = Array.from(root.childNodes);
     // Treat input as plain text by escaping regex metacharacters
-    const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escapeRegExp = (s: string): string =>
+      s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = escapeRegExp(searchText);
     const regex = new RegExp(pattern, "gi");
     const ops: Array<{ parent: HTMLElement; node: Node; html: string }> = [];
@@ -250,7 +300,9 @@ export async function performSearch(
 
       // Helpers to find word boundaries to the left/right of a position
       const isWS = (ch: string): boolean => /\s/.test(ch);
-      const findWordLeft = (pos: number): { start: number; end: number } | null => {
+      const findWordLeft = (
+        pos: number
+      ): { start: number; end: number } | null => {
         let i = pos - 1;
         while (i >= 0 && isWS(raw[i])) i--;
         if (i < 0) return null;
@@ -259,7 +311,9 @@ export async function performSearch(
         const start = i + 1;
         return { start, end };
       };
-      const findWordRight = (pos: number): { start: number; end: number } | null => {
+      const findWordRight = (
+        pos: number
+      ): { start: number; end: number } | null => {
         let i = pos;
         while (i < raw.length && isWS(raw[i])) i++;
         if (i >= raw.length) return null;
@@ -308,7 +362,13 @@ export async function performSearch(
         if (r.kind === "off" && isOverlappingBlink(r)) continue;
         // Skip if identical to previous
         const prev = norm[norm.length - 1];
-        if (prev && prev.start === r.start && prev.end === r.end && prev.kind === r.kind) continue;
+        if (
+          prev &&
+          prev.start === r.start &&
+          prev.end === r.end &&
+          prev.kind === r.kind
+        )
+          continue;
         norm.push(r);
       }
 
@@ -361,7 +421,9 @@ export async function performSearch(
   };
 
   removeBlinkingStyles();
-  (window as unknown as { __accessibleFindStyles?: any }).__accessibleFindStyles = {
+  (
+    window as unknown as { __accessibleFindStyles?: any }
+  ).__accessibleFindStyles = {
     highlightBgColor,
     highlightTextColor,
     outlineColor,
@@ -398,7 +460,9 @@ export async function performSearch(
   blinkElementsApplied.forEach((el) => {
     (el as HTMLElement).style.fontSize = `${matchFontSize}px`;
   });
-  const matches = Array.from(document.querySelectorAll(".blink")) as HTMLElement[];
+  const matches = Array.from(
+    document.querySelectorAll(".blink")
+  ) as HTMLElement[];
   setMatches(matches);
   // Determine default selection closest to viewport center
   let defaultIndex: number | null = null;
@@ -420,19 +484,24 @@ export async function performSearch(
   setCurrentIndex(defaultIndex);
   applyCurrentSelection(defaultIndex);
   const id = applyBlinkingStyles();
-  return { blinkIntervalId: id, count: matches.length, currentIndex: defaultIndex };
+  return {
+    blinkIntervalId: id,
+    count: matches.length,
+    currentIndex: defaultIndex,
+  };
 }
 
 export function cancelSearchAndCleanup(): void {
   // Invalidate any ongoing search by setting a new token
   const setActiveToken = (token: number | null): void => {
-    (window as unknown as { __accessibleFindActiveToken?: number | null }).
-      __accessibleFindActiveToken = token;
+    (
+      window as unknown as { __accessibleFindActiveToken?: number | null }
+    ).__accessibleFindActiveToken = token;
   };
-  setActiveToken(Math.floor(Date.now() ^ Math.random() * 1e9));
+  setActiveToken(Math.floor(Date.now() ^ (Math.random() * 1e9)));
   const getBlinkIntervalId = (): number | null =>
-    (window as unknown as { __accessibleFindBlinkIntervalId?: number | null }).
-      __accessibleFindBlinkIntervalId ?? null;
+    (window as unknown as { __accessibleFindBlinkIntervalId?: number | null })
+      .__accessibleFindBlinkIntervalId ?? null;
   const setBlinkIntervalId = (id: number | null): void => {
     (
       window as unknown as { __accessibleFindBlinkIntervalId?: number | null }
@@ -444,9 +513,7 @@ export function cancelSearchAndCleanup(): void {
     setBlinkIntervalId(null);
   }
   const removeBlinkingStyles = (): void => {
-    const blinkingElements = document.querySelectorAll(
-      ".blink, .blink-off"
-    );
+    const blinkingElements = document.querySelectorAll(".blink, .blink-off");
     blinkingElements.forEach((element) => {
       const parent = element.parentNode as HTMLElement | null;
       if (!parent) return;
@@ -454,58 +521,89 @@ export function cancelSearchAndCleanup(): void {
     });
   };
   removeBlinkingStyles();
-  (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).__accessibleFindMatches = [];
-  (window as unknown as { __accessibleFindCurrentIndex?: number | null }).__accessibleFindCurrentIndex = null;
+  (
+    window as unknown as { __accessibleFindMatches?: HTMLElement[] }
+  ).__accessibleFindMatches = [];
+  (
+    window as unknown as { __accessibleFindCurrentIndex?: number | null }
+  ).__accessibleFindCurrentIndex = null;
   // Clear any selected-only blink interval
   try {
-    const sel = (window as unknown as { __afSelectedBlinkId?: number | null }).__afSelectedBlinkId ?? null;
-    if (typeof sel === 'number') {
+    const sel =
+      (window as unknown as { __afSelectedBlinkId?: number | null })
+        .__afSelectedBlinkId ?? null;
+    if (typeof sel === "number") {
       window.clearInterval(sel);
-      (window as unknown as { __afSelectedBlinkId?: number | null }).__afSelectedBlinkId = null;
+      (
+        window as unknown as { __afSelectedBlinkId?: number | null }
+      ).__afSelectedBlinkId = null;
     }
     // Reset any tracked group and token
-    (window as unknown as { __afSelectedBlinkGroup?: { on: HTMLElement[]; off: HTMLElement[] } | null }).__afSelectedBlinkGroup = null;
-    (window as unknown as { __afSelectedBlinkToken?: number | null }).__afSelectedBlinkToken = null;
+    (
+      window as unknown as {
+        __afSelectedBlinkGroup?: {
+          on: HTMLElement[];
+          off: HTMLElement[];
+        } | null;
+      }
+    ).__afSelectedBlinkGroup = null;
+    (
+      window as unknown as { __afSelectedBlinkToken?: number | null }
+    ).__afSelectedBlinkToken = null;
   } catch {}
 }
 
-export function navigateMatches(direction: "next" | "prev"): { count: number; currentIndex: number | null } {
+export function navigateMatches(direction: "next" | "prev"): {
+  count: number;
+  currentIndex: number | null;
+} {
   const getMatches = (): HTMLElement[] =>
-    (window as unknown as { __accessibleFindMatches?: HTMLElement[] }).
-      __accessibleFindMatches ?? [];
-  const styles = (window as unknown as { __accessibleFindStyles?: {
-    highlightBgColor: string;
-    highlightTextColor: string;
-    outlineColor: string;
-    borderWidth: number;
-    blinkInterval?: number;
-    numBlinks?: number;
-    numSurroundingWords?: number;
-    selectedBgColor?: string;
-    selectedBorderColor?: string;
-    selectedTextColor?: string;
-  } }).__accessibleFindStyles ?? {
-    highlightBgColor: '#ffff00',
-    highlightTextColor: '#000000',
-    outlineColor: '#ff8c00',
-    borderWidth: 3,
-    blinkInterval: 400,
-    numBlinks: 2,
-    numSurroundingWords: 1,
-  };
+    (window as unknown as { __accessibleFindMatches?: HTMLElement[] })
+      .__accessibleFindMatches ?? [];
+  const styles =
+    (
+      window as unknown as {
+        __accessibleFindStyles?: {
+          highlightBgColor: string;
+          highlightTextColor: string;
+          outlineColor: string;
+          borderWidth: number;
+          blinkInterval?: number;
+          numBlinks?: number;
+          numSurroundingWords?: number;
+          selectedBgColor?: string;
+          selectedBorderColor?: string;
+          selectedTextColor?: string;
+        };
+      }
+    ).__accessibleFindStyles ?? defaultSettings;
   // Inline helper so it survives chrome.scripting serialization
-  function blinkSelectedInline(node: HTMLElement, st: { highlightBgColor: string; selectedBgColor?: string; selectedTextColor?: string; highlightTextColor: string; blinkInterval?: number; numBlinks?: number; numSurroundingWords?: number; }): void {
+  function blinkSelectedInline(
+    node: HTMLElement,
+    st: {
+      highlightBgColor: string;
+      selectedBgColor?: string;
+      selectedTextColor?: string;
+      highlightTextColor: string;
+      blinkInterval?: number;
+      numBlinks?: number;
+      numSurroundingWords?: number;
+    }
+  ): void {
     const maxSur = Math.max(0, Number(st.numSurroundingWords ?? 1));
-    const collectSurrounding = (n: HTMLElement, dir: 'left' | 'right'): HTMLElement[] => {
+    const collectSurrounding = (
+      n: HTMLElement,
+      dir: "left" | "right"
+    ): HTMLElement[] => {
       const out: HTMLElement[] = [];
       let cur: ChildNode | null = n;
       let count = 0;
       while (cur && count < maxSur) {
-        cur = dir === 'left' ? cur.previousSibling : cur.nextSibling;
+        cur = dir === "left" ? cur.previousSibling : cur.nextSibling;
         if (!cur) break;
         if (cur.nodeType === Node.TEXT_NODE) continue;
         const el2 = cur as HTMLElement;
-        if (el2.classList && el2.classList.contains('blink-off')) {
+        if (el2.classList && el2.classList.contains("blink-off")) {
           out.push(el2);
           count++;
         } else {
@@ -514,8 +612,8 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
       }
       return out;
     };
-    const left = collectSurrounding(node, 'left').reverse();
-    const right = collectSurrounding(node, 'right');
+    const left = collectSurrounding(node, "left").reverse();
+    const right = collectSurrounding(node, "right");
     const groupBlink: HTMLElement[] = [node];
     const groupOff: HTMLElement[] = [...left, ...right];
     const applySelected = (elements: HTMLElement[], highlighted: boolean) => {
@@ -524,8 +622,8 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
           e.style.backgroundColor = st.selectedBgColor ?? st.highlightBgColor;
           e.style.color = st.selectedTextColor ?? st.highlightTextColor;
         } else {
-          e.style.removeProperty('background-color');
-          e.style.removeProperty('color');
+          e.style.removeProperty("background-color");
+          e.style.removeProperty("color");
         }
       });
     };
@@ -535,17 +633,51 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
           e.style.backgroundColor = st.highlightBgColor;
           e.style.color = st.highlightTextColor;
         } else {
-          e.style.removeProperty('background-color');
-          e.style.removeProperty('color');
+          e.style.removeProperty("background-color");
+          e.style.removeProperty("color");
         }
       });
     };
-    const getSelBlinkId = (): number | null => (window as unknown as { __afSelectedBlinkId?: number | null }).__afSelectedBlinkId ?? null;
-    const setSelBlinkId = (v: number | null) => { (window as unknown as { __afSelectedBlinkId?: number | null }).__afSelectedBlinkId = v; };
-    const getSelBlinkGroup = (): { on: HTMLElement[]; off: HTMLElement[] } | null => (window as unknown as { __afSelectedBlinkGroup?: { on: HTMLElement[]; off: HTMLElement[] } | null }).__afSelectedBlinkGroup ?? null;
-    const setSelBlinkGroup = (g: { on: HTMLElement[]; off: HTMLElement[] } | null) => { (window as unknown as { __afSelectedBlinkGroup?: { on: HTMLElement[]; off: HTMLElement[] } | null }).__afSelectedBlinkGroup = g; };
-    const getSelBlinkToken = (): number | null => (window as unknown as { __afSelectedBlinkToken?: number | null }).__afSelectedBlinkToken ?? null;
-    const setSelBlinkToken = (t: number | null) => { (window as unknown as { __afSelectedBlinkToken?: number | null }).__afSelectedBlinkToken = t; };
+    const getSelBlinkId = (): number | null =>
+      (window as unknown as { __afSelectedBlinkId?: number | null })
+        .__afSelectedBlinkId ?? null;
+    const setSelBlinkId = (v: number | null) => {
+      (
+        window as unknown as { __afSelectedBlinkId?: number | null }
+      ).__afSelectedBlinkId = v;
+    };
+    const getSelBlinkGroup = (): {
+      on: HTMLElement[];
+      off: HTMLElement[];
+    } | null =>
+      (
+        window as unknown as {
+          __afSelectedBlinkGroup?: {
+            on: HTMLElement[];
+            off: HTMLElement[];
+          } | null;
+        }
+      ).__afSelectedBlinkGroup ?? null;
+    const setSelBlinkGroup = (
+      g: { on: HTMLElement[]; off: HTMLElement[] } | null
+    ) => {
+      (
+        window as unknown as {
+          __afSelectedBlinkGroup?: {
+            on: HTMLElement[];
+            off: HTMLElement[];
+          } | null;
+        }
+      ).__afSelectedBlinkGroup = g;
+    };
+    const getSelBlinkToken = (): number | null =>
+      (window as unknown as { __afSelectedBlinkToken?: number | null })
+        .__afSelectedBlinkToken ?? null;
+    const setSelBlinkToken = (t: number | null) => {
+      (
+        window as unknown as { __afSelectedBlinkToken?: number | null }
+      ).__afSelectedBlinkToken = t;
+    };
 
     // Reset previous group's visual state before switching:
     // revert previously selected element to normal highlight, and remove off-highlights
@@ -557,9 +689,12 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
       }
     } catch {}
     const prevId = getSelBlinkId();
-    if (typeof prevId === 'number') { window.clearInterval(prevId); setSelBlinkId(null); }
+    if (typeof prevId === "number") {
+      window.clearInterval(prevId);
+      setSelBlinkId(null);
+    }
     // New token to invalidate any stray ticks from previous intervals
-    const token = Math.floor(Date.now() ^ Math.random() * 1e9);
+    const token = Math.floor(Date.now() ^ (Math.random() * 1e9));
     setSelBlinkToken(token);
     let remaining = Math.max(1, Number(st.numBlinks ?? 2)) * 2;
     const interval = Math.max(50, Number(st.blinkInterval ?? 400));
@@ -570,8 +705,17 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
     setSelBlinkGroup({ on: groupBlink, off: groupOff });
     const id = window.setInterval(() => {
       // Invalidate ticks from a previous selection quickly
-      if (getSelBlinkToken() !== token) { window.clearInterval(id); return; }
-      if (remaining <= 0) { window.clearInterval(id); setSelBlinkId(null); applySelected(groupBlink, true); applyOff(groupOff, false); return; }
+      if (getSelBlinkToken() !== token) {
+        window.clearInterval(id);
+        return;
+      }
+      if (remaining <= 0) {
+        window.clearInterval(id);
+        setSelBlinkId(null);
+        applySelected(groupBlink, true);
+        applyOff(groupOff, false);
+        return;
+      }
       const on = remaining % 2 === 1;
       applySelected(groupBlink, on);
       applyOff(groupOff, !on);
@@ -580,12 +724,13 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
     setSelBlinkId(id);
   }
   const setCurrentIndex = (idx: number | null): void => {
-    (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
-      __accessibleFindCurrentIndex = idx;
+    (
+      window as unknown as { __accessibleFindCurrentIndex?: number | null }
+    ).__accessibleFindCurrentIndex = idx;
   };
   const getCurrentIndex = (): number | null =>
-    (window as unknown as { __accessibleFindCurrentIndex?: number | null }).
-      __accessibleFindCurrentIndex ?? null;
+    (window as unknown as { __accessibleFindCurrentIndex?: number | null })
+      .__accessibleFindCurrentIndex ?? null;
   const matches = getMatches();
   const count = matches.length;
   if (count === 0) {
@@ -610,27 +755,39 @@ export function navigateMatches(direction: "next" | "prev"): { count: number; cu
     m.style.removeProperty("display");
     // Ensure any previously selected match reverts to normal highlight colors
     try {
-      const st = (window as unknown as { __accessibleFindStyles?: {
-        highlightBgColor: string; highlightTextColor: string;
-      } }).__accessibleFindStyles;
-      if (st) { m.style.backgroundColor = st.highlightBgColor; m.style.color = st.highlightTextColor; }
+      const st = (
+        window as unknown as {
+          __accessibleFindStyles?: {
+            highlightBgColor: string;
+            highlightTextColor: string;
+          };
+        }
+      ).__accessibleFindStyles;
+      if (st) {
+        m.style.backgroundColor = st.highlightBgColor;
+        m.style.color = st.highlightTextColor;
+      }
     } catch {}
   });
   const el = matches[idx];
   if (el) {
-    const selectedBorderColor = (styles as any).selectedBorderColor ?? styles.outlineColor;
+    const selectedBorderColor =
+      (styles as any).selectedBorderColor ?? styles.outlineColor;
     el.style.outline = `${styles.borderWidth}px solid ${selectedBorderColor}`;
-    el.style.display = 'inline-block';
+    el.style.display = "inline-block";
     el.style.marginLeft = `${styles.borderWidth}px`;
     el.style.marginRight = `${styles.borderWidth}px`;
-    const selectedBgColor = (styles as any).selectedBgColor ?? styles.highlightBgColor;
-    const selectedTextColor = (styles as any).selectedTextColor ?? styles.highlightTextColor;
+    const selectedBgColor =
+      (styles as any).selectedBgColor ?? styles.highlightBgColor;
+    const selectedTextColor =
+      (styles as any).selectedTextColor ?? styles.highlightTextColor;
     el.style.backgroundColor = selectedBgColor;
     el.style.color = selectedTextColor;
     el.scrollIntoView({ block: "center", inline: "nearest" });
     // Blink only the selected match (and its surrounding words) using the standard timings/colors
-    try { blinkSelectedInline(el, styles); } catch {}
+    try {
+      blinkSelectedInline(el, styles);
+    } catch {}
   }
   return { count, currentIndex: idx };
 }
-

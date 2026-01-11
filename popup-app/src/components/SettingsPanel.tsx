@@ -1,0 +1,398 @@
+import React, { useEffect, useMemo, useState } from "react";
+
+export type Settings = {
+  blinkInterval: number;
+  numBlinks: number;
+  numSurroundingWords: number;
+  highlightBgColor: string;
+  highlightTextColor: string;
+  outlineColor: string;
+  borderWidth: number;
+  matchFontSize: number;
+  selectedBgColor: string;
+  selectedBorderColor: string;
+  selectedTextColor: string;
+};
+
+type SettingsPanelProps = {
+  settings: Settings;
+  onChange: (next: Settings) => void;
+  onClose: () => void;
+  onReset: () => void;
+  onSave: () => void;
+};
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="border border-slate-700 rounded p-2 h-full" aria-labelledby={`${title}-legend`}>
+      <legend id={`${title}-legend`} className="px-1 text-sm font-semibold text-gray-200">
+        {title}
+      </legend>
+      <div className="grid grid-cols-[max-content,1fr] gap-x-2 gap-y-2 items-center">{children}</div>
+    </fieldset>
+  );
+}
+
+function Label({ id, children }: { id: string; children: React.ReactNode }) {
+  return (
+    <label htmlFor={id} className="text-xs text-gray-300">
+      {children}
+    </label>
+  );
+}
+
+function NumberInput({
+  id,
+  value,
+  min,
+  step,
+  onChange,
+  describedBy,
+}: {
+  id: string;
+  value: number;
+  min?: number;
+  step?: number;
+  onChange: (val: number) => void;
+  describedBy?: string;
+}) {
+  return (
+    <input
+      id={id}
+      type="number"
+      className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200 w-full"
+      min={min}
+      step={step}
+      aria-describedby={describedBy}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+    />
+  );
+}
+
+function ColorInput({
+  id,
+  value,
+  onChange,
+  describedBy,
+}: {
+  id: string;
+  value: string;
+  onChange: (val: string) => void;
+  describedBy?: string;
+}) {
+  return (
+    <input
+      id={id}
+      type="color"
+      className="border border-slate-700 rounded px-2 py-1 bg-slate-900 w-full"
+      aria-describedby={describedBy}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+// WCAG contrast helpers
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const m = hex.trim().match(/^#([\da-f]{3}|[\da-f]{6})$/i);
+  if (!m) return null;
+  let h = m[1];
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  const num = parseInt(h, 16);
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+}
+
+function relLuminance({ r, g, b }: { r: number; g: number; b: number }): number {
+  const srgb = [r, g, b].map((c) => c / 255);
+  const f = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const [R, G, B] = srgb.map(f);
+  return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+}
+
+function contrastRatio(bgHex: string, fgHex: string): number | null {
+  const bg = hexToRgb(bgHex);
+  const fg = hexToRgb(fgHex);
+  if (!bg || !fg) return null;
+  const L1 = relLuminance(bg);
+  const L2 = relLuminance(fg);
+  const lighter = Math.max(L1, L2);
+  const darker = Math.min(L1, L2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+export function SettingsPanel({ settings, onChange, onClose, onReset, onSave }: SettingsPanelProps) {
+  // Shortcut status
+  const [shortcut, setShortcut] = useState<string | null>(null);
+  const [checking, setChecking] = useState<boolean>(true);
+
+  function getShortcutsUrl(): string {
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes("edg/")) return "edge://extensions/shortcuts";
+    if (ua.includes("vivaldi")) return "vivaldi://extensions/shortcuts";
+    if (ua.includes("opr/")) return "chrome://extensions/shortcuts";
+    return "chrome://extensions/shortcuts";
+  }
+
+  useEffect(() => {
+    let timer: number | null = null;
+    function check() {
+      try {
+        // @ts-ignore chrome is available in extension context
+        if (!(chrome && chrome.commands && chrome.commands.getAll)) {
+          setChecking(false);
+          setShortcut(null);
+          return;
+        }
+        // @ts-ignore
+        chrome.commands.getAll((cmds: Array<{ name: string; shortcut?: string }>) => {
+          const cmd = (cmds || []).find((c) => c.name === "open_popup");
+          const sc = cmd && cmd.shortcut && cmd.shortcut.trim().length > 0 ? cmd.shortcut : null;
+          setShortcut(sc);
+          setChecking(sc == null);
+        });
+      } catch {
+        setChecking(false);
+        setShortcut(null);
+      }
+    }
+    check();
+    timer = window.setInterval(check, 1500);
+    return () => {
+      if (timer) window.clearInterval(timer);
+    };
+  }, []);
+
+  const statusText = useMemo(() => {
+    if (shortcut) return `Shortcut set: ${shortcut}`;
+    if (checking) return "Checking shortcut…";
+    return "No shortcut set (waiting…)";
+  }, [shortcut, checking]);
+
+  function openShortcuts() {
+    const url = getShortcutsUrl();
+    try {
+      const w = window.open(url, "_blank");
+      if (w) return;
+    } catch {}
+    // Fallback via background
+    // @ts-ignore
+    chrome.runtime.sendMessage({ action: "openShortcuts" }, (res: { ok: boolean } | null) => {
+      if (res && res.ok) return;
+      alert(
+        `Please open ${url} and set a shortcut for "Open Accessible Find In Page popup" (not "Activate the extension").`
+      );
+    });
+  }
+
+  const ratioHighlight = contrastRatio(settings.highlightBgColor, settings.highlightTextColor);
+  const ratioSelected = contrastRatio(settings.selectedBgColor, settings.selectedTextColor);
+
+  const warnHighlight = ratioHighlight !== null && ratioHighlight < 4.5;
+  const warnSelected = ratioSelected !== null && ratioSelected < 4.5;
+
+  return (
+    <div
+      id="settings-panel"
+      role="dialog"
+      aria-labelledby="settings-title"
+      aria-describedby="settings-help"
+      className="p-2 space-y-3"
+    >
+      <h2 id="settings-title" className="text-base font-semibold">Settings</h2>
+      <p id="settings-help" className="text-xs text-slate-400">
+        Tune highlight behavior and colors. All controls are keyboard-accessible; contrast warnings help choose readable colors.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Section title="Blinking">
+          <Label id="blinkInterval">Interval (ms)</Label>
+          <NumberInput
+            id="blinkInterval"
+            value={settings.blinkInterval}
+            min={100}
+            step={50}
+            onChange={(val) => onChange({ ...settings, blinkInterval: val })}
+          />
+
+          <Label id="numBlinks"># Blinks</Label>
+          <NumberInput
+            id="numBlinks"
+            value={settings.numBlinks}
+            min={1}
+            onChange={(val) => onChange({ ...settings, numBlinks: val })}
+          />
+
+          <Label id="numSurroundingWords">Surrounding words</Label>
+          <NumberInput
+            id="numSurroundingWords"
+            value={settings.numSurroundingWords}
+            min={0}
+            onChange={(val) => onChange({ ...settings, numSurroundingWords: val })}
+          />
+        </Section>
+
+        <Section title="Size & Border Width">
+          <Label id="matchFontSize">Match font size (px)</Label>
+          <NumberInput
+            id="matchFontSize"
+            value={settings.matchFontSize}
+            min={8}
+            onChange={(val) => onChange({ ...settings, matchFontSize: val })}
+          />
+
+          <Label id="borderWidth">Border width (px)</Label>
+          <NumberInput
+            id="borderWidth"
+            value={settings.borderWidth}
+            min={1}
+            onChange={(val) => onChange({ ...settings, borderWidth: val })}
+          />
+        </Section>
+
+        <Section title="Highlight Colors">
+          <Label id="highlightBgColor">Background</Label>
+          <ColorInput
+            id="highlightBgColor"
+            value={settings.highlightBgColor}
+            onChange={(val) => onChange({ ...settings, highlightBgColor: val })}
+            describedBy="highlight-contrast"
+          />
+
+          <Label id="highlightTextColor">Text</Label>
+          <ColorInput
+            id="highlightTextColor"
+            value={settings.highlightTextColor}
+            onChange={(val) => onChange({ ...settings, highlightTextColor: val })}
+            describedBy="highlight-contrast"
+          />
+
+          <Label id="outlineColor">Border</Label>
+          <ColorInput
+            id="outlineColor"
+            value={settings.outlineColor}
+            onChange={(val) => onChange({ ...settings, outlineColor: val })}
+          />
+
+          <div className="col-span-2 flex items-center gap-2" aria-live="polite">
+            <div
+              className="rounded px-2 py-1 border"
+              style={{
+                background: settings.highlightBgColor,
+                color: settings.highlightTextColor,
+                borderColor: settings.outlineColor,
+              }}
+            >
+              Sample text
+            </div>
+          </div>
+          <div className="col-span-2">
+            <span id="highlight-contrast" className="text-xs text-slate-300">
+              Contrast: {ratioHighlight ? ratioHighlight.toFixed(2) : "n/a"} {warnHighlight ? "(below 4.5:1)" : ""}
+            </span>
+          </div>
+        </Section>
+
+        <Section title="Selected Match Colors">
+          <Label id="selectedBgColor">Background</Label>
+          <ColorInput
+            id="selectedBgColor"
+            value={settings.selectedBgColor}
+            onChange={(val) => onChange({ ...settings, selectedBgColor: val })}
+            describedBy="selected-contrast"
+          />
+
+          <Label id="selectedTextColor">Text</Label>
+          <ColorInput
+            id="selectedTextColor"
+            value={settings.selectedTextColor}
+            onChange={(val) => onChange({ ...settings, selectedTextColor: val })}
+            describedBy="selected-contrast"
+          />
+
+          <Label id="selectedBorderColor">Border</Label>
+          <ColorInput
+            id="selectedBorderColor"
+            value={settings.selectedBorderColor}
+            onChange={(val) => onChange({ ...settings, selectedBorderColor: val })}
+          />
+
+          <div className="col-span-2 flex items-center gap-2" aria-live="polite">
+            <div
+              className="rounded px-2 py-1 border"
+              style={{
+                background: settings.selectedBgColor,
+                color: settings.selectedTextColor,
+                borderColor: settings.selectedBorderColor,
+              }}
+            >
+              Selected text
+            </div>
+          </div>
+          <div className="col-span-2">
+            <span id="selected-contrast" className="text-xs text-slate-300">
+              Contrast: {ratioSelected ? ratioSelected.toFixed(2) : "n/a"} {warnSelected ? "(below 4.5:1)" : ""}
+            </span>
+          </div>
+        </Section>
+
+        {/* Keyboard shortcut section */}
+        <div className="col-span-2">
+          <Section title="Keyboard Shortcut">
+            <Label id="shortcutRow">Shortcut</Label>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                aria-live="polite"
+                className={`text-xs rounded-full border px-2 py-0.5 ${
+                  shortcut
+                    ? "border-emerald-500 text-emerald-300 bg-emerald-900/20"
+                    : "border-amber-500 text-amber-300 bg-amber-900/20"
+                }`}
+              >
+                {statusText}
+              </span>
+              {checking && (
+                <span aria-hidden className="w-3 h-3 rounded-full border-2 border-slate-600 border-t-blue-400 animate-spin" />
+              )}
+              <button
+                onClick={openShortcuts}
+                className="text-xs bg-blue-600 hover:bg-blue-700 border border-blue-600 text-white rounded px-2 py-1"
+                aria-describedby="shortcutHelp"
+              >
+                Open shortcut settings
+              </button>
+            </div>
+
+            <div className="col-span-2">
+              <p className="text-xs text-slate-400" id="shortcutHelp">
+                Set a key for <span className="font-semibold">"Open Accessible Find In Page popup"</span> (not
+                <span className="font-semibold"> "Activate the extension"</span>).
+              </p>
+            </div>
+          </Section>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 mt-2">
+        <button
+          className="border border-slate-700 rounded px-3 py-1 text-sm bg-slate-900 hover:bg-slate-800"
+          onClick={onClose}
+        >
+          Close
+        </button>
+        <button
+          className="border border-slate-700 rounded px-3 py-1 text-sm bg-slate-900 hover:bg-slate-800"
+          onClick={onReset}
+        >
+          Reset to defaults
+        </button>
+        <button
+          className="bg-blue-600 text-white rounded px-3 py-1 text-sm disabled:opacity-50 hover:bg-blue-700"
+          onClick={onSave}
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}

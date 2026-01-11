@@ -17,13 +17,13 @@ export const defaultSettings: Settings = {
   numBlinks: 2,
   numSurroundingWords: 1,
   highlightBgColor: "#ffff00",
-  highlightTextColor: "#000",
+  highlightTextColor: "#000000",
   outlineColor: "#ff8c00",
   borderWidth: 3,
   matchFontSize: 20,
   selectedBgColor: "#ff8c00",
   selectedBorderColor: "#ffff00",
-  selectedTextColor: "#fff",
+  selectedTextColor: "#ffffff",
 };
 
 export function getSettings(): Promise<Settings> {
@@ -34,7 +34,28 @@ export function getSettings(): Promise<Settings> {
           ? (result as { settings?: Settings }).settings!
           : defaultSettings;
       const merged: Settings = { ...defaultSettings, ...raw };
-      resolve(merged);
+      // Normalize any 3-digit hex colors to 6-digit for input[type=color] compatibility
+      const normalizeHex = (hex: string): string => {
+        try {
+          const m = hex.trim().match(/^#([\da-f]{3}|[\da-f]{6})$/i);
+          if (!m) return hex;
+          let h = m[1];
+          if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+          return `#${h.toLowerCase()}`;
+        } catch {
+          return hex;
+        }
+      };
+      const normalized: Settings = {
+        ...merged,
+        highlightBgColor: normalizeHex(merged.highlightBgColor),
+        highlightTextColor: normalizeHex(merged.highlightTextColor),
+        outlineColor: normalizeHex(merged.outlineColor),
+        selectedBgColor: normalizeHex(merged.selectedBgColor),
+        selectedBorderColor: normalizeHex(merged.selectedBorderColor),
+        selectedTextColor: normalizeHex(merged.selectedTextColor),
+      };
+      resolve(normalized);
     });
   });
 }

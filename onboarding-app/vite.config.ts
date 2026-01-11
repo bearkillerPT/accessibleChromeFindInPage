@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: '../dist/onboarding-app',
-    emptyOutDir: false,
+    emptyOutDir: true,
   },
   base: '',
 });
