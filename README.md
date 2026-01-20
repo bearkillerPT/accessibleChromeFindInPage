@@ -1,57 +1,30 @@
 # Accessible find in page
-Accessible find in page is a browser extension that makes it easier to search for text on a web page on chromium based browsers.
-It is designed to be used by people with visual impairments and temporarely blinks the lines containing the search term.
+This project is an accessibility-focused browser extension intended to replace the default find-in-page (CTRL+F) functionality of Chromium-based browsers. I've been diagnosed with Retinitis Pigmentosa, a degenerative eye condition that severely impacts my vision. As a result, I found it challenging to use the default find-in-page feature, which often made it difficult to locate search results on a page. This extension aims to address these challenges by providing customizable highlighting options, including colors and blinking effects, to make search results more visible and easier to locate.
+
+<img src="demo.png" alt="Demo of the extension in action" width="600"/>
 
 ## Installation
-### From the Chrome Web Store
-(TODO)
-Accessible find in page is available on the [Chrome Web Store](https://chrome.google.com/webstore/detail/accessible-find-in-page/okjgjgkfbfjgjgjgjgjgjgjgjgjgjgj). Just click the "Add to Chrome" button.
+After installation, the onboarding tab will open automatically. There you have a quick guide on how to use the extension and an easy way to override the default CTRL+F shortcut.
 
-### From source
+### Installing from the Chrome Web Store
+(TODO)
+Accessible find in page is available on the [Chrome Web Store](https://chromewebstore.google.com/detail/accessible-find-in-page/micmgbkeghgbbdmmoieoodhmofafhhlp). Just click the "Add to Chrome" button.
+
+### Installing from source
 1. Clone the repository
 2. Run `npm install`
 3. Run `npm run build`
 4. Open the extensions page in your browser
 5. Enable developer mode
 6. Click "Load unpacked extension"
-7. Select the `dist` folder
+7. Select the `root` folder of the project
+
 
 ## Usage
-1. Click the extension icon to open the popup
-2. Type a search term; matching lines blink
-3. Use ▲/▼ to navigate previous/next match
-4. The default selected match is closest to the viewport center
-5. The counter shows total matches found
- - Or press the shortcut to open the popup (configurable under chrome://extensions/shortcuts; default is Ctrl+Shift+F)
+The extension can be activated in any page by either:
+- Clicking the extension icon in Chrome's toolbar (you can pin it for easier access)
+- Pressing the shortcut (if you have set it up, otherwise it can always be changed in the onboarding tab or in the settings)
+Once activated, a popup will appear where you can enter your search query. The extension will highlight all occurrences of the query on the page according to your settings.
 
-## Options
-### Search term
-(TODO)
-### Blinking
-Blinking is the main feature of this extension. It makes the lines containing the search term blink. You can set the blink interval and the number of blinks.
-It also allows to have a number of surrounding words blink alternatingly with the search term.
-
-### Navigation
-When a search is active, the extension selects the match closest to the center of the viewport. You can navigate through matches using the ▲ (previous) and ▼ (next) buttons. The popup displays the total number of matches found.
-
-## Contributing
-### TODO
-- [ ] Keyboard shortcuts
-- [ ] PDF support
-- [ ] Search term options (case sensitive, whole word, regex, etc.)
-- [ ] Selecting only elements that CTRL+F would select (I've tried a few things, but I can't get exactly the same results)
-- [ ] Selecting a specific result and going to previous/next result using different color and shortcut
-
-
-## Example
-If you wish to try out the extension, you can go to [this page](https://heaboo.bearkillerpt.xyz/), to test in a really simple page, or, as the example in the demo video does, try it on [GitHub](https://www.github.com/bearkillerpt/accessible-find-in-page/).
-Checkout the [demo video](https://www.github.com/bearkillerpt/accessible-find-in-page/demo.mp4) to see it in action!
-
-## Disclaimer
-This extension is still in development and may not work as expected. 
-Right now the extension looks at every tag containing text content but on a google search page, for example, the page brakes when the replacement spans are inserted.
-
-Create an issue if you want more options besides the ones listed above.
-
-I myself have Retinitis pigmentosa :/
-
+# Contributing
+Feel free to contribute! Any help is appreciated, be it code, documentation, or just ideas!
