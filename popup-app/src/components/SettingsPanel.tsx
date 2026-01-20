@@ -34,13 +34,19 @@ type SettingsPanelProps = {
 function Section({
   title,
   children,
+  disabled,
 }: {
   title: string;
   children: React.ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <fieldset
-      className="border border-slate-700 rounded p-2 h-full"
+      disabled={disabled}
+      aria-disabled={disabled || undefined}
+      className={`border border-slate-700 rounded p-2 h-full w-full ${
+        disabled ? "opacity-60" : ""
+      }`}
       aria-labelledby={`${title}-legend`}
     >
       <legend
@@ -49,7 +55,7 @@ function Section({
       >
         {title}
       </legend>
-      <div className="grid grid-cols-[max-content,1fr] gap-x-2 gap-y-2 items-center">
+      <div className="grid grid-cols-1 gap-2 items-start min-w-0 sm:[grid-template-columns:max-content_1fr] sm:gap-x-3 sm:gap-y-2 sm:items-center">
         {children}
       </div>
     </fieldset>
@@ -58,7 +64,7 @@ function Section({
 
 function Label({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <label htmlFor={id} className="text-xs text-gray-300">
+    <label htmlFor={id} className="text-xs text-gray-300 min-w-0 break-words">
       {children}
     </label>
   );
@@ -83,7 +89,7 @@ function NumberInput({
     <input
       id={id}
       type="number"
-      className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200 w-full"
+      className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200 w-full min-w-0"
       min={min}
       step={step}
       aria-describedby={describedBy}
@@ -108,7 +114,7 @@ function ColorInput({
     <input
       id={id}
       type="color"
-      className="border border-slate-700 rounded px-2 py-1 bg-slate-900 w-full"
+      className="border border-slate-700 rounded px-2 py-1 bg-slate-900 w-full min-w-0"
       aria-describedby={describedBy}
       value={value}
       onChange={(e) => onChange(e.target.value)}
@@ -196,17 +202,15 @@ export function SettingsPanel({
           return;
         }
         // @ts-ignore
-        chrome.commands.getAll(
-          (cmds: Array<{ name: string; shortcut?: string }>) => {
-            const cmd = (cmds || []).find((c) => c.name === "open_popup");
-            const sc =
-              cmd && cmd.shortcut && cmd.shortcut.trim().length > 0
-                ? cmd.shortcut
-                : null;
-            setShortcut(sc);
-            setChecking(sc == null);
-          }
-        );
+        chrome.commands.getAll((cmds) => {
+          const cmd = (cmds || []).find((c) => c.name === "open_popup");
+          const sc =
+            cmd && cmd.shortcut && cmd.shortcut.trim().length > 0
+              ? cmd.shortcut
+              : null;
+          setShortcut(sc);
+          setChecking(sc == null);
+        });
       } catch {
         setChecking(false);
         setShortcut(null);
@@ -276,33 +280,33 @@ export function SettingsPanel({
       <div>
         <Section title="Keyboard Shortcut">
           <Label id="shortcutRow">Shortcut</Label>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 w-full">
             <span
               aria-live="polite"
               className={`text-xs rounded-full border px-2 py-0.5 ${
                 shortcut
                   ? "border-emerald-500 text-emerald-300 bg-emerald-900/20"
                   : "border-amber-500 text-amber-300 bg-amber-900/20"
-              }`}
+              } w-full sm:w-auto text-center sm:text-left break-words whitespace-pre-wrap`}
             >
               {statusText}
             </span>
             {checking && (
               <span
                 aria-hidden
-                className="w-3 h-3 rounded-full border-2 border-slate-600 border-t-blue-400 animate-spin"
+                className="w-3 h-3 rounded-full border-2 border-slate-600 border-t-blue-400 animate-spin self-center"
               />
             )}
             <button
               onClick={openShortcuts}
-              className="text-xs bg-blue-600 hover:bg-blue-700 border border-blue-600 text-white rounded px-2 py-1"
+              className="text-xs bg-blue-600 hover:bg-blue-700 border border-blue-600 text-white rounded px-2 py-1 w-full sm:w-auto"
               aria-describedby="shortcutHelp"
             >
               Open shortcut settings
             </button>
           </div>
 
-          <div className="col-span-2">
+          <div className="w-full sm:col-span-2">
             <p className="text-xs text-slate-400" id="shortcutHelp">
               Set a key for{" "}
               <span className="font-semibold">
@@ -321,7 +325,7 @@ export function SettingsPanel({
         {profiles.length > 0 ? (
           <select
             id="profile-select"
-            className="text-sm bg-slate-900 text-gray-200 border border-slate-700 rounded px-2 py-1"
+            className="text-sm bg-slate-900 text-gray-200 border border-slate-700 rounded px-2 py-1 w-full sm:w-auto"
             value={activeProfileId ?? ""}
             onChange={(e) => onSelectProfile(e.target.value)}
             aria-describedby="profile-help"
@@ -354,22 +358,14 @@ export function SettingsPanel({
         )}
 
         {!renaming ? (
-          <div className="inline-flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1 w-full sm:w-auto">
             <button
               className="text-xs border border-slate-700 text-gray-200 rounded px-2 py-1 hover:bg-slate-800"
               onClick={() => onCreateProfile()}
-              aria-label={
-                activeIsSystem
-                  ? "Duplicate system profile"
-                  : "Create new profile"
-              }
-              title={
-                activeIsSystem
-                  ? "Duplicate system profile"
-                  : "Create new profile"
-              }
+              aria-label="Duplicate profile"
+              title="Duplicate profile"
             >
-              {activeIsSystem ? "⧉ Duplicate" : "➕ New"}
+              ⧉ Duplicate
             </button>
             <button
               className="text-xs border border-slate-700 text-gray-200 rounded px-2 py-1 hover:bg-slate-800 disabled:opacity-50"
@@ -411,9 +407,9 @@ export function SettingsPanel({
             </button>
           </div>
         ) : (
-          <div className="inline-flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1 w-full sm:w-auto">
             <input
-              className="text-sm bg-slate-900 text-gray-200 border border-slate-700 rounded px-2 py-1"
+              className="text-sm bg-slate-900 text-gray-200 border border-slate-700 rounded px-2 py-1 w-full sm:w-auto"
               value={renameVal}
               onChange={(e) => setRenameVal(e.target.value)}
               onKeyDown={(e) => {
@@ -448,13 +444,13 @@ export function SettingsPanel({
             </button>
           </div>
         )}
-        <p id="profile-help" className="text-xs text-slate-400">
+        <p id="profile-help" className="text-xs text-slate-400 w-full">
           Manage your settings profiles.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Section title="Blinking">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Section title="Blinking" disabled={!!activeIsSystem}>
           <Label id="blinkInterval">Interval (ms)</Label>
           <NumberInput
             id="blinkInterval"
@@ -483,7 +479,7 @@ export function SettingsPanel({
           />
         </Section>
 
-        <Section title="Size & Border Width">
+        <Section title="Size & Border Width" disabled={!!activeIsSystem}>
           <Label id="matchFontSize">Match font size (px)</Label>
           <NumberInput
             id="matchFontSize"
@@ -501,7 +497,7 @@ export function SettingsPanel({
           />
         </Section>
 
-        <Section title="Highlight Colors">
+        <Section title="Highlight Colors" disabled={!!activeIsSystem}>
           <Label id="highlightBgColor">Background</Label>
           <ColorInput
             id="highlightBgColor"
@@ -527,9 +523,9 @@ export function SettingsPanel({
             onChange={(val) => onChange({ ...settings, outlineColor: val })}
           />
 
-          <div className="col-span-2 text-xs text-slate-300">Preview</div>
+          <div className="text-xs text-slate-300 sm:col-span-2">Preview</div>
           <div
-            className="col-span-2 flex items-center gap-2"
+            className="flex items-center gap-2 flex-wrap sm:col-span-2"
             aria-live="polite"
           >
             <div
@@ -545,7 +541,7 @@ export function SettingsPanel({
               Sample text
             </div>
           </div>
-          <div className="col-span-2">
+          <div className="sm:col-span-2">
             <span id="highlight-contrast" className="text-xs text-slate-300">
               Text–background contrast:{" "}
               {ratioHighlight ? ratioHighlight.toFixed(2) : "n/a"}{" "}
@@ -554,7 +550,7 @@ export function SettingsPanel({
           </div>
         </Section>
 
-        <Section title="Selected Match Colors">
+        <Section title="Selected Match Colors" disabled={!!activeIsSystem}>
           <Label id="selectedBgColor">Background</Label>
           <ColorInput
             id="selectedBgColor"
@@ -582,9 +578,9 @@ export function SettingsPanel({
             }
           />
 
-          <div className="col-span-2 text-xs text-slate-300">Preview</div>
+          <div className="text-xs text-slate-300 sm:col-span-2">Preview</div>
           <div
-            className="col-span-2 flex items-center gap-2"
+            className="flex items-center gap-2 flex-wrap sm:col-span-2"
             aria-live="polite"
           >
             <div
@@ -600,7 +596,7 @@ export function SettingsPanel({
               Selected text
             </div>
           </div>
-          <div className="col-span-2">
+          <div className="sm:col-span-2">
             <span id="selected-contrast" className="text-xs text-slate-300">
               Text–background contrast:{" "}
               {ratioSelected ? ratioSelected.toFixed(2) : "n/a"}{" "}
@@ -608,28 +604,6 @@ export function SettingsPanel({
             </span>
           </div>
         </Section>
-      </div>
-
-      <div className="flex justify-end gap-2 mt-2">
-        <button
-          className="border border-slate-700 rounded px-3 py-1 text-sm bg-slate-900 hover:bg-slate-800"
-          onClick={onClose}
-        >
-          Close
-        </button>
-        <button
-          className="border border-slate-700 rounded px-3 py-1 text-sm bg-slate-900 hover:bg-slate-800"
-          onClick={onReset}
-        >
-          Reset to defaults
-        </button>
-        <button
-          className="bg-blue-600 text-white rounded px-3 py-1 text-sm disabled:opacity-50 hover:bg-blue-700"
-          disabled={!!activeIsSystem}
-          onClick={onSave}
-        >
-          Save
-        </button>
       </div>
     </div>
   );

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
-import { SettingsPanel, type Settings as PanelSettings } from "./components/SettingsPanel";
+import {
+  SettingsPanel,
+  type Settings as PanelSettings,
+} from "./components/SettingsPanel";
 
 type Settings = {
   blinkInterval: number;
@@ -16,7 +19,6 @@ type Settings = {
   selectedBorderColor: string;
   selectedTextColor: string;
 };
-
 type FindResponse = {
   ok: boolean;
   count?: number;
@@ -31,10 +33,12 @@ type NavigateResponse = {
 
 export default function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [profiles, setProfiles] = useState<Array<{ id: string; name: string; system?: boolean }>>([]);
+  const [savedSettings, setSavedSettings] = useState<Settings | null>(null);
+  const [profiles, setProfiles] = useState<
+    Array<{ id: string; name: string; system?: boolean }>
+  >([]);
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  // Controls enter/exit animation of the popup container
   const [visible, setVisible] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [count, setCount] = useState(0);
@@ -72,18 +76,45 @@ export default function App() {
   useEffect(() => {
     chrome.runtime.sendMessage(
       { action: "getProfiles" },
-      (response: { ok: boolean; state?: { profiles: Array<{ id: string; name: string; settings: Settings }>; activeProfileId: string } } | null) => {
+      (
+        response: {
+          ok: boolean;
+          state?: {
+            profiles: Array<{ id: string; name: string; settings: Settings }>;
+            activeProfileId: string;
+          };
+        } | null
+      ) => {
         const state = response?.state;
-        if (state && Array.isArray(state.profiles) && state.profiles.length > 0) {
-          setProfiles(state.profiles.map(p => ({ id: p.id, name: p.name, system: (p as any).system || false })));
+        if (
+          state &&
+          Array.isArray(state.profiles) &&
+          state.profiles.length > 0
+        ) {
+          setProfiles(
+            state.profiles.map((p) => ({
+              id: p.id,
+              name: p.name,
+              system: (p as any).system || false,
+            }))
+          );
           setActiveProfileId(state.activeProfileId);
-          const active = state.profiles.find(p => p.id === state.activeProfileId) || state.profiles[0];
+          const active =
+            state.profiles.find((p) => p.id === state.activeProfileId) ||
+            state.profiles[0];
           setSettings(active.settings);
+          setSavedSettings(active.settings);
         } else {
           // Fallback to legacy single settings (background will migrate when first profile action occurs)
-          chrome.runtime.sendMessage({ action: "getSettings" }, (s: Settings | null) => {
-            if (s) setSettings(s);
-          });
+          chrome.runtime.sendMessage(
+            { action: "getSettings" },
+            (s: Settings | null) => {
+              if (s) {
+                setSettings(s);
+                setSavedSettings(s);
+              }
+            }
+          );
         }
       }
     );
@@ -91,14 +122,35 @@ export default function App() {
 
   function refreshProfilesAndActiveSettings(): void {
     chrome.runtime.sendMessage(
-      { action: 'getProfiles' },
-      (response: { ok: boolean; state?: { profiles: Array<{ id: string; name: string; settings: Settings }>; activeProfileId: string } } | null) => {
+      { action: "getProfiles" },
+      (
+        response: {
+          ok: boolean;
+          state?: {
+            profiles: Array<{ id: string; name: string; settings: Settings }>;
+            activeProfileId: string;
+          };
+        } | null
+      ) => {
         const state = response?.state;
-        if (state && Array.isArray(state.profiles) && state.profiles.length > 0) {
-          setProfiles(state.profiles.map(p => ({ id: p.id, name: p.name, system: (p as any).system || false })));
+        if (
+          state &&
+          Array.isArray(state.profiles) &&
+          state.profiles.length > 0
+        ) {
+          setProfiles(
+            state.profiles.map((p) => ({
+              id: p.id,
+              name: p.name,
+              system: (p as any).system || false,
+            }))
+          );
           setActiveProfileId(state.activeProfileId);
-          const active = state.profiles.find(p => p.id === state.activeProfileId) || state.profiles[0];
+          const active =
+            state.profiles.find((p) => p.id === state.activeProfileId) ||
+            state.profiles[0];
           setSettings(active.settings);
+          setSavedSettings(active.settings);
         }
       }
     );
@@ -124,9 +176,12 @@ export default function App() {
         const EXIT_MS = 200;
         window.setTimeout(() => {
           try {
-            chrome.runtime.sendMessage({ action: "findInPage", searchTerm: "" }, () => {
-              chrome.runtime.sendMessage({ action: "closeOverlay" });
-            });
+            chrome.runtime.sendMessage(
+              { action: "findInPage", searchTerm: "" },
+              () => {
+                chrome.runtime.sendMessage({ action: "closeOverlay" });
+              }
+            );
           } catch {
             chrome.runtime.sendMessage({ action: "closeOverlay" });
           }
@@ -181,15 +236,28 @@ export default function App() {
     const el = rootRef.current;
     if (!el) return;
     const sendSize = () => {
-      const width = Math.ceil(el.scrollWidth);
-      const height = Math.ceil(el.scrollHeight);
+      const measuredWidth = Math.ceil(el.scrollWidth);
+      const rect = el.getBoundingClientRect();
+      const BASE_COMPACT = 360;
+      const BASE_OPEN = 640;
+      const MAX_WIDTH = 760;
+      const minPreferred = open ? BASE_OPEN : BASE_COMPACT;
+      let width = Math.max(measuredWidth, minPreferred);
+      width = Math.min(width, MAX_WIDTH);
+      const measuredHeight = Math.ceil(rect.height);
+      const height = measuredHeight + 1;
       try {
-        window.parent?.postMessage({ type: "accessible-find:size", width, height }, "*");
+        window.parent?.postMessage(
+          { type: "accessible-find:size", width, height },
+          "*"
+        );
       } catch {}
     };
     // Initial send + observe for changes
     sendSize();
-    const ro = new ResizeObserver(() => sendSize());
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(() => sendSize());
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, [rootRef, open, settings, searchTerm, count, currentIndex]);
@@ -209,15 +277,24 @@ export default function App() {
   }, []);
 
   const canSave = useMemo(() => !!settings, [settings]);
+  const isDirty = useMemo(() => {
+    if (!settings || !savedSettings) return false;
+    try {
+      return JSON.stringify(settings) !== JSON.stringify(savedSettings);
+    } catch {
+      return false;
+    }
+  }, [settings, savedSettings]);
   const activeIsSystem = useMemo(() => {
     if (!activeProfileId) return false;
-    const p = profiles.find(p => p.id === activeProfileId);
+    const p = profiles.find((p) => p.id === activeProfileId);
     return !!p?.system;
   }, [activeProfileId, profiles]);
 
   function saveSettings() {
     if (!settings) return;
     chrome.runtime.sendMessage({ action: "setSettings", settings }, () => {
+      setSavedSettings(settings);
       setOpen(false);
       // If there's an active search term, re-run search to apply new styles immediately
       if (searchTerm && searchTerm.trim().length > 0) {
@@ -226,10 +303,20 @@ export default function App() {
       // Refresh profiles state to reflect any normalization
       chrome.runtime.sendMessage(
         { action: "getProfiles" },
-        (response: { ok: boolean; state?: { profiles: Array<{ id: string; name: string; settings: Settings }>; activeProfileId: string } } | null) => {
+        (
+          response: {
+            ok: boolean;
+            state?: {
+              profiles: Array<{ id: string; name: string; settings: Settings }>;
+              activeProfileId: string;
+            };
+          } | null
+        ) => {
           const state = response?.state;
           if (state) {
-            setProfiles(state.profiles.map(p => ({ id: p.id, name: p.name })));
+            setProfiles(
+              state.profiles.map((p) => ({ id: p.id, name: p.name }))
+            );
             setActiveProfileId(state.activeProfileId);
           }
         }
@@ -271,10 +358,13 @@ export default function App() {
     const EXIT_MS = 200;
     window.setTimeout(() => {
       try {
-        chrome.runtime.sendMessage({ action: "findInPage", searchTerm: "" }, () => {
-          setSearchTerm("");
-          chrome.runtime.sendMessage({ action: "closeOverlay" });
-        });
+        chrome.runtime.sendMessage(
+          { action: "findInPage", searchTerm: "" },
+          () => {
+            setSearchTerm("");
+            chrome.runtime.sendMessage({ action: "closeOverlay" });
+          }
+        );
       } catch {
         setSearchTerm("");
         chrome.runtime.sendMessage({ action: "closeOverlay" });
@@ -285,7 +375,8 @@ export default function App() {
   function onInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       e.preventDefault();
-      if (e.shiftKey) onPrev(); else onNext();
+      if (e.shiftKey) onPrev();
+      else onNext();
     }
   }
 
@@ -299,182 +390,212 @@ export default function App() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -6, scale: 0.98 }}
           transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-          className="flex flex-col p-2 gap-2 bg-slate-900 text-gray-200 overflow-hidden border border-slate-700 rounded-md shadow-lg"
+          className="flex flex-col p-2 gap-2 bg-slate-900 text-gray-200 overflow-x-hidden overflow-y-auto border border-slate-700 rounded-md shadow-lg"
         >
-      {needsShortcut && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs rounded p-2">
-          <div className="flex items-center justify-between gap-2">
-            <span>
-              Set a keyboard shortcut for{" "}
-              <strong>"Open Accessible Find In Page popup"</strong> (not
-              "Activate the extension").
-            </span>
-            <button
-              className="border rounded px-2 py-0.5 hover:bg-yellow-100"
-              onClick={() => {
-                const ua = navigator.userAgent.toLowerCase();
-                const url = ua.includes("edg/")
-                  ? "edge://extensions/shortcuts"
-                  : ua.includes("vivaldi")
-                  ? "vivaldi://extensions/shortcuts"
-                  : "chrome://extensions/shortcuts";
+          {needsShortcut && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs rounded p-2">
+              <div className="flex items-center justify-between gap-2">
+                <span>
+                  Set a keyboard shortcut for{" "}
+                  <strong>"Open Accessible Find In Page popup"</strong> (not
+                  "Activate the extension").
+                </span>
+                <button
+                  className="border rounded px-2 py-0.5 hover:bg-yellow-100"
+                  onClick={() => {
+                    const ua = navigator.userAgent.toLowerCase();
+                    const url = ua.includes("edg/")
+                      ? "edge://extensions/shortcuts"
+                      : ua.includes("vivaldi")
+                      ? "vivaldi://extensions/shortcuts"
+                      : "chrome://extensions/shortcuts";
 
-                chrome.runtime.sendMessage(
-                  { action: "openShortcuts" },
-                  async (res: { ok: boolean; error?: string } | null) => {
-                    if (res && res.ok) return;
-                    alert(
-                      "Please open " +
-                        url +
-                        ' and set a shortcut for "Open Accessible Find In Page popup" (not "Activate the extension").'
-                    );
-                  }
-                );
-              }}
-            >
-              Open shortcut settings
-            </button>
-          </div>
-        </div>
-      )}
-      <div className="flex items-center gap-2 w-[384px]">
-          <button
-          className="text-xl"
-          title="Settings"
-          aria-label="Toggle settings"
-          aria-expanded={open}
-          aria-controls="settings-panel"
-          onClick={() => setOpen((o) => !o)}
-        >
-          ⚙️
-        </button>
-        <div className="flex-1 min-w-0">
-          <label htmlFor="search-input" className="sr-only">Search term</label>
-          <input
-            id="search-input"
-            ref={inputRef}
-            autoFocus
-            value={searchTerm}
-            onChange={(e) => onTermChange(e.target.value)}
-            onKeyDown={onInputKeyDown}
-            placeholder="Find in Page"
-            aria-describedby="search-help"
-            className="w-full border border-slate-700 rounded px-2 py-1 text-sm bg-slate-800 text-gray-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p id="search-help" className="sr-only">Type to search. Press Enter for next, Shift+Enter for previous.</p>
-        </div>
-        <div className="flex items-center gap-1">
-          {findMutation.isPending ? (
-            <span className="text-xs text-slate-400 min-w-12 text-right inline-flex items-center justify-end">
-              <span className="inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-            </span>
-          ) : (
-            <span className="text-s text-gray-300 min-w-12 text-right" aria-live="polite" aria-atomic="true">
-              {currentIndex !== null && count > 0
-                ? `${currentIndex + 1}/${count}`
-                : `${count}/${count}`}
-            </span>
-          )}
-          <button
-            className="border border-slate-700 rounded px-1 text-xs bg-slate-800 hover:bg-slate-700"
-            title="Previous"
-            aria-label="Previous match"
-            onClick={onPrev}
-            disabled={count === 0 || findMutation.isPending}
-          >
-            ▲
-          </button>
-          <button
-            className="border border-slate-700 rounded px-1 text-xs bg-slate-800 hover:bg-slate-700"
-            title="Next"
-            aria-label="Next match"
-            onClick={onNext}
-            disabled={count === 0 || findMutation.isPending}
-          >
-            ▼
-          </button>
-          <button
-            className="border border-slate-700 rounded px-2 text-sm ml-1 bg-slate-800 hover:bg-slate-700"
-            title="Close"
-            aria-label="Close popup"
-            onClick={onClose}
-          >
-            ✖
-          </button>
-        </div>
-      </div>
-
-      <AnimatePresence initial={false}>
-        {settings && (
-          <motion.div
-            key="settings"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: open ? "auto" : 0, opacity: open ? 1 : 0 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.2, 0.65, 0.3, 0.9] }}
-            style={{ overflow: "hidden" }}
-            className="border border-slate-700 rounded bg-slate-800 min-w-[540px] max-w-[680px]"
-          >
-            <div className="p-2">
-              <SettingsPanel
-                settings={settings as PanelSettings}
-                onChange={(next) => setSettings(next)}
-                onClose={() => setOpen(false)}
-                onReset={() => {
-                  chrome.runtime.sendMessage({ action: 'resetSettings' }, (resp: { ok: boolean; settings?: Settings } | null) => {
-                    if (resp && resp.ok && resp.settings) {
-                      setSettings(resp.settings);
-                      if (searchTerm && searchTerm.trim().length > 0) {
-                        findMutation.mutate(searchTerm);
+                    chrome.runtime.sendMessage(
+                      { action: "openShortcuts" },
+                      async (res: { ok: boolean; error?: string } | null) => {
+                        if (res && res.ok) return;
+                        alert(
+                          "Please open " +
+                            url +
+                            ' and set a shortcut for "Open Accessible Find In Page popup" (not "Activate the extension").'
+                        );
                       }
-                      // Update profiles list after reset
-                      chrome.runtime.sendMessage({ action: 'getProfiles' }, (response: { ok: boolean; state?: { profiles: Array<{ id: string; name: string; settings: Settings }>; activeProfileId: string } } | null) => {
-                        const state = response?.state;
-                        if (state) {
-                          setProfiles(state.profiles.map(p => ({ id: p.id, name: p.name })));
-                          setActiveProfileId(state.activeProfileId);
-                        }
-                      });
-                    }
-                  });
-                }}
-                onSave={saveSettings}
-                profiles={profiles}
-                activeProfileId={activeProfileId}
-                activeIsSystem={activeIsSystem}
-                onSelectProfile={(id) => {
-                  chrome.runtime.sendMessage({ action: 'setActiveProfile', profileId: id }, (_response: any) => {
-                    refreshProfilesAndActiveSettings();
-                    if (searchTerm && searchTerm.trim().length > 0) findMutation.mutate(searchTerm);
-                  });
-                }}
-                onCreateProfile={() => {
-                  // Optimistic UI update for immediate feedback
-                  const tempId = 'local-' + Math.floor(Date.now() + Math.random() * 1e6).toString(36);
-                  const tempName = 'New Profile';
-                  setProfiles((prev) => [...prev, { id: tempId, name: tempName }]);
-                  setActiveProfileId(tempId);
-                  // Persist via background
-                  chrome.runtime.sendMessage({ action: 'createProfile', baseSettings: settings as Settings }, (_response: any) => {
-                    refreshProfilesAndActiveSettings();
-                  });
-                }}
-                onRenameProfile={(id, name) => {
-                  chrome.runtime.sendMessage({ action: 'renameProfile', profileId: id, name }, (_response: any) => {
-                    refreshProfilesAndActiveSettings();
-                  });
-                }}
-                onDeleteProfile={(id) => {
-                  chrome.runtime.sendMessage({ action: 'deleteProfile', profileId: id }, (_response: any) => {
-                    refreshProfilesAndActiveSettings();
-                    if (searchTerm && searchTerm.trim().length > 0) findMutation.mutate(searchTerm);
-                  });
-                }}
-              />
+                    );
+                  }}
+                >
+                  Open shortcut settings
+                </button>
+              </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+          <div className="flex items-center gap-2 self-start max-w-full">
+            <button
+              className="text-xl"
+              title="Settings"
+              aria-label="Toggle settings"
+              aria-expanded={open}
+              aria-controls="settings-panel"
+              onClick={() => setOpen((o) => !o)}
+            >
+              ⚙️
+            </button>
+            <div className="max-w-full">
+              <label htmlFor="search-input" className="sr-only">
+                Search term
+              </label>
+              <input
+                id="search-input"
+                ref={inputRef}
+                autoFocus
+                value={searchTerm}
+                onChange={(e) => onTermChange(e.target.value)}
+                onKeyDown={onInputKeyDown}
+                placeholder="Find in Page"
+                aria-describedby="search-help"
+                className="w-64 max-w-full border border-slate-700 rounded px-2 py-1 text-sm bg-slate-800 text-gray-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p id="search-help" className="sr-only">
+                Type to search. Press Enter for next, Shift+Enter for previous.
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              {findMutation.isPending ? (
+                <span className="text-xs text-slate-400 min-w-12 text-right inline-flex items-center justify-end">
+                  <span className="inline-block w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                </span>
+              ) : (
+                <span
+                  className="text-s text-gray-300 min-w-12 text-right"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {currentIndex !== null && count > 0
+                    ? `${currentIndex + 1}/${count}`
+                    : `${count}/${count}`}
+                </span>
+              )}
+              <button
+                className="border border-slate-700 rounded px-1 text-xs bg-slate-800 hover:bg-slate-700"
+                title="Previous (Shift+Enter)"
+                aria-label="Previous match"
+                onClick={onPrev}
+                disabled={count === 0 || findMutation.isPending}
+              >
+                ▲
+              </button>
+              <button
+                className="border border-slate-700 rounded px-1 text-xs bg-slate-800 hover:bg-slate-700"
+                title="Next (Enter)"
+                aria-label="Next match"
+                onClick={onNext}
+                disabled={count === 0 || findMutation.isPending}
+              >
+                ▼
+              </button>
+              <button
+                className="border border-slate-700 rounded px-2 text-sm ml-1 bg-slate-800 hover:bg-slate-700"
+                title="Close"
+                aria-label="Close popup"
+                onClick={onClose}
+              >
+                ✖
+              </button>
+            </div>
+          </div>
+
+          <AnimatePresence initial={false}>
+            {open && settings && (
+              <motion.div
+                key="settings"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: open ? "auto" : 0, opacity: open ? 1 : 0 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.2, 0.65, 0.3, 0.9] }}
+                style={{ overflowX: "hidden" }}
+                className="settings-root settings-panel-shell border border-slate-700 rounded bg-slate-800 flex flex-col"
+              >
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <div className="p-2">
+                    <SettingsPanel
+                      settings={settings as PanelSettings}
+                      onChange={(next) => setSettings(next)}
+                      onClose={() => {}}
+                      onReset={() => {}}
+                      onSave={() => {}}
+                      profiles={profiles}
+                      activeProfileId={activeProfileId}
+                      activeIsSystem={activeIsSystem}
+                      onSelectProfile={(id) => {
+                        chrome.runtime.sendMessage(
+                          { action: "setActiveProfile", profileId: id },
+                          (_response: any) => {
+                            refreshProfilesAndActiveSettings();
+                            if (searchTerm && searchTerm.trim().length > 0)
+                              findMutation.mutate(searchTerm);
+                          }
+                        );
+                      }}
+                      onCreateProfile={() => {
+                        const tempId =
+                          "local-" +
+                          Math.floor(Date.now() + Math.random() * 1e6).toString(
+                            36
+                          );
+                        const tempName = "New Profile";
+                        setProfiles((prev) => [
+                          ...prev,
+                          { id: tempId, name: tempName },
+                        ]);
+                        setActiveProfileId(tempId);
+                        chrome.runtime.sendMessage(
+                          {
+                            action: "createProfile",
+                            baseSettings: settings as Settings,
+                          },
+                          (_response: any) => {
+                            refreshProfilesAndActiveSettings();
+                          }
+                        );
+                      }}
+                      onRenameProfile={(id, name) => {
+                        chrome.runtime.sendMessage(
+                          { action: "renameProfile", profileId: id, name },
+                          (_response: any) => {
+                            refreshProfilesAndActiveSettings();
+                          }
+                        );
+                      }}
+                      onDeleteProfile={(id) => {
+                        chrome.runtime.sendMessage(
+                          { action: "deleteProfile", profileId: id },
+                          (_response: any) => {
+                            refreshProfilesAndActiveSettings();
+                            if (searchTerm && searchTerm.trim().length > 0)
+                              findMutation.mutate(searchTerm);
+                          }
+                        );
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 border-t border-slate-700 p-2 mb-4 bg-slate-800">
+                  <button
+                    className="border border-slate-700 rounded px-3 py-1 text-sm bg-slate-900 hover:bg-slate-800 flex-[1_1_140px] sm:flex-initial"
+                    onClick={() => setOpen(false)}
+                  >
+                    Close
+                  </button>
+                  <button
+                    className="bg-blue-600 text-white rounded px-3 py-1 text-sm disabled:opacity-50 hover:bg-blue-700 flex-[1_1_140px] sm:flex-initial"
+                    disabled={!!activeIsSystem || !isDirty}
+                    onClick={saveSettings}
+                  >
+                    Save
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>

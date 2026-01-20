@@ -183,6 +183,11 @@ chrome.runtime.onMessage.addListener(
                 window.removeEventListener('message', handler);
                 (window as any).__af_onMessage = undefined;
               }
+              const onResize = (window as any).__af_onResize as (() => void) | undefined;
+              if (onResize) {
+                window.removeEventListener('resize', onResize);
+                (window as any).__af_onResize = undefined;
+              }
             } catch {}
             // Remove any keydown handler
             try {
@@ -242,6 +247,39 @@ function injectReactOverlay(width: number, height: number): void {
   iframe.setAttribute('title', 'Accessible Find In Page');
   overlay.appendChild(iframe);
   root.appendChild(overlay);
+  const getViewportLimit = () => {
+    const inner = Math.max(window.innerWidth - 16, 0);
+    if (!Number.isFinite(inner) || inner <= 0) return Math.min(900, width);
+    return Math.min(inner, 900);
+  };
+  const getViewportHeightLimit = () => {
+    const inner = Math.max(window.innerHeight - 16, 0);
+    if (!Number.isFinite(inner) || inner <= 0) return undefined;
+    return inner;
+  };
+  let lastRequestedWidth = width;
+  let lastRequestedHeight = height;
+  const applySize = (nextWidth: number | undefined, nextHeight: number | undefined) => {
+    if (typeof nextWidth === 'number' && !Number.isNaN(nextWidth)) {
+      lastRequestedWidth = nextWidth;
+    }
+    if (typeof nextHeight === 'number' && !Number.isNaN(nextHeight)) {
+      lastRequestedHeight = nextHeight;
+    }
+    const viewportLimit = getViewportLimit();
+    const viewportHeightLimit = getViewportHeightLimit();
+    const fallbackWidth = viewportLimit > 0 ? viewportLimit : Math.min(900, width);
+    const desiredWidth = Math.max(320, typeof nextWidth === 'number' && !Number.isNaN(nextWidth) ? nextWidth : Math.max(lastRequestedWidth, fallbackWidth));
+    const resolvedWidth = viewportLimit > 0 ? Math.min(desiredWidth, viewportLimit) : desiredWidth;
+    iframe.style.width = resolvedWidth + 'px';
+    const desiredHeight = typeof nextHeight === 'number' && !Number.isNaN(nextHeight)
+      ? nextHeight
+      : lastRequestedHeight;
+    const resolvedHeight = typeof viewportHeightLimit === 'number'
+      ? Math.min(desiredHeight, viewportHeightLimit)
+      : desiredHeight;
+    iframe.style.height = resolvedHeight + 'px';
+  };
   // Ensure input focus when the iframe finishes loading
   iframe.addEventListener('load', () => {
     try { iframe.contentWindow?.postMessage({ type: 'focusInput' }, '*'); } catch {}
@@ -265,17 +303,18 @@ function injectReactOverlay(width: number, height: number): void {
   const onMessage = (e: MessageEvent) => {
     try {
       if (e.source === iframe.contentWindow && e.data && (e.data as any).type === 'accessible-find:size') {
-        const d = e.data as { type: string; width: number; height: number };
-        const w = Number(d.width) || width;
-        const h = Number(d.height) || height;
-        iframe.style.width = w + 'px';
-        iframe.style.height = h + 'px';
+        const d = e.data as { type: string; width?: number; height?: number };
+        applySize(d.width, d.height);
       }
     } catch {}
   };
   window.addEventListener('message', onMessage);
   // Expose handler for cleanup on closeOverlay
   (window as any).__af_onMessage = onMessage;
+  applySize(width, height);
+  const onResize = () => applySize(lastRequestedWidth, lastRequestedHeight);
+  window.addEventListener('resize', onResize);
+  (window as any).__af_onResize = onResize;
   document.documentElement.appendChild(container);
 }
 
