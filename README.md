@@ -1,4 +1,4 @@
-# Accessible find in page
+# <img src="128.png" height=24 /> Accessible find in page
 This project is an accessibility-focused browser extension intended to replace the default find-in-page (CTRL+F) functionality of Chromium-based browsers. I've been diagnosed with Retinitis Pigmentosa, a degenerative eye condition that severely impacts my vision. As a result, I found it challenging to use the default find-in-page feature, which often made it difficult to locate search results on a page. This extension aims to address these challenges by providing customizable highlighting options, including colors and blinking effects, to make search results more visible and easier to locate.
 
 <img src="demo.png" alt="Demo of the extension in action" width="600"/>
