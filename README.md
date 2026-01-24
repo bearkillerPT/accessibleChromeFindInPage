@@ -3,6 +3,8 @@ This project is an accessibility-focused browser extension intended to replace t
 
 <img src="demo.png" alt="Demo of the extension in action" width="600"/>
 
+[Video demo](https://www.youtube.com/watch?v=aUPxAvyhch4)
+
 ## Installation
 After installation, the onboarding tab will open automatically. There you have a quick guide on how to use the extension and an easy way to override the default CTRL+F shortcut.
 
@@ -28,3 +30,4 @@ Once activated, a popup will appear where you can enter your search query. The e
 
 # Contributing
 Feel free to contribute! Any help is appreciated, be it code, documentation, or just ideas!
+If you like the extension, please do star this repository and leave a review on the [chrome extension store](https://chromewebstore.google.com/detail/accessible-find-in-page/micmgbkeghgbbdmmoieoodhmofafhhlp).
