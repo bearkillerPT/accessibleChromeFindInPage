@@ -6,11 +6,9 @@ This project is an accessibility-focused browser extension intended to replace t
 [Video demo](https://www.youtube.com/watch?v=aUPxAvyhch4)
 
 ## Installation
-After installation, the onboarding tab will open automatically. There you have a quick guide on how to use the extension and an easy way to override the default CTRL+F shortcut.
-
+The extension has been published to the Chrome Web Store for easy installation. If you want me to release it on other browsers' extension stores, please open an issue or contact me.
 ### Installing from the Chrome Web Store
-(TODO)
-Accessible find in page is available on the [Chrome Web Store](https://chromewebstore.google.com/detail/accessible-find-in-page/micmgbkeghgbbdmmoieoodhmofafhhlp). Just click the "Add to Chrome" button.
+Go to the [Chrome Web Store listing](https://chromewebstore.google.com/detail/accessible-find-in-page/micmgbkeghgbbdmmoieoodhmofafhhlp) and click the "Add to Chrome" button.
 
 ### Installing from source
 1. Clone the repository
@@ -21,6 +19,7 @@ Accessible find in page is available on the [Chrome Web Store](https://chromeweb
 6. Click "Load unpacked extension"
 7. Select the `root` folder of the project
 
+After installation, an onboarding tab will open automatically with a quick guide on how to use the extension and an easy way to override the default CTRL+F shortcut. The shortcut can also be changed later in the extension settings and, if you unninstall the extension, the default CTRL+F behavior will be restored!
 
 ## Usage
 The extension can be activated in any page by either:
