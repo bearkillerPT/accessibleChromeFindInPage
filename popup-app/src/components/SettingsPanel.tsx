@@ -1,4 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Section } from "./Section";
+import { Label } from "./Label";
+import { NumberInput } from "./NumberInput";
+import { ColorInput } from "./ColorInput";
 
 export type Settings = {
   blinkInterval: number;
@@ -30,97 +34,6 @@ type SettingsPanelProps = {
   onDeleteProfile: (id: string) => void;
   activeIsSystem?: boolean;
 };
-
-function Section({
-  title,
-  children,
-  disabled,
-}: {
-  title: string;
-  children: React.ReactNode;
-  disabled?: boolean;
-}) {
-  return (
-    <fieldset
-      disabled={disabled}
-      aria-disabled={disabled || undefined}
-      className={`border border-slate-700 rounded p-2 h-full w-full ${
-        disabled ? "opacity-60" : ""
-      }`}
-      aria-labelledby={`${title}-legend`}
-    >
-      <legend
-        id={`${title}-legend`}
-        className="px-1 text-sm font-semibold text-gray-200"
-      >
-        {title}
-      </legend>
-      <div className="grid grid-cols-1 gap-2 items-start min-w-0 sm:[grid-template-columns:max-content_1fr] sm:gap-x-3 sm:gap-y-2 sm:items-center">
-        {children}
-      </div>
-    </fieldset>
-  );
-}
-
-function Label({ id, children }: { id: string; children: React.ReactNode }) {
-  return (
-    <label htmlFor={id} className="text-xs text-gray-300 min-w-0 break-words">
-      {children}
-    </label>
-  );
-}
-
-function NumberInput({
-  id,
-  value,
-  min,
-  step,
-  onChange,
-  describedBy,
-}: {
-  id: string;
-  value: number;
-  min?: number;
-  step?: number;
-  onChange: (val: number) => void;
-  describedBy?: string;
-}) {
-  return (
-    <input
-      id={id}
-      type="number"
-      className="border border-slate-700 rounded px-2 py-1 text-sm bg-slate-900 text-gray-200 w-full min-w-0"
-      min={min}
-      step={step}
-      aria-describedby={describedBy}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-    />
-  );
-}
-
-function ColorInput({
-  id,
-  value,
-  onChange,
-  describedBy,
-}: {
-  id: string;
-  value: string;
-  onChange: (val: string) => void;
-  describedBy?: string;
-}) {
-  return (
-    <input
-      id={id}
-      type="color"
-      className="border border-slate-700 rounded px-2 py-1 bg-slate-900 w-full min-w-0"
-      aria-describedby={describedBy}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
-}
 
 // WCAG contrast helpers
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
